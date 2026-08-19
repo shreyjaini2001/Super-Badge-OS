@@ -9,8 +9,18 @@ import base64
 import time
 
 # Constants
-SERIAL_PORT = "/dev/cu.usbmodem14101"
+import serial.tools.list_ports
+
 BAUD_RATE = 115200
+
+def get_serial_port():
+    ports = serial.tools.list_ports.comports()
+    for port in ports:
+        if "usbmodem" in port.device:
+            return port.device
+    return None
+
+SERIAL_PORT = get_serial_port()
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
