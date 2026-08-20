@@ -4,16 +4,24 @@
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 
 #define LED_PIN     8
 #define NUM_LEDS    16
 #define TFT_CS      1
 #define TFT_DC      0
-#define TFT_RST     21
+#define TFT_RST     -1 // Use SWRESET
 #define TFT_MOSI    7
 #define TFT_SCLK    6
 #define SCREEN_W    320
 #define SCREEN_H    240
+
+#define I2C_SDA     20
+#define I2C_SCL     21
+#define PCF8574_ADDR 0x20
+
+#define BTN_B3      10
+#define BTN_B4      9
 
 Adafruit_ST7789 tft(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -23,6 +31,14 @@ int led_brightness = 80;
 String current_pattern = "Solid";
 unsigned long last_pattern_update = 0;
 uint16_t pattern_step = 0;
+
+bool pcf_ready = false;
+
+// Debounce state
+bool state_b1 = false;
+bool state_b2 = false;
+bool state_b3 = false;
+bool state_b4 = false;
 
 uint32_t Wheel(byte WheelPos) {
   WheelPos = 255 - WheelPos;
@@ -37,7 +53,6 @@ uint32_t Wheel(byte WheelPos) {
 
 void updateLEDs() {
   if (current_pattern == "Solid") return;
-  
   if (current_pattern == "Rainbow") {
     if (millis() - last_pattern_update > 20) {
       last_pattern_update = millis();
@@ -121,7 +136,6 @@ void typeText(String text, int size, int r, int g, int b, String align) {
   tft.fillScreen(ST77XX_BLACK);
   tft.setTextSize(size);
   tft.setTextColor(tft.color565(r, g, b));
-  
   int charW = 6 * size;
   int charH = 8 * size;
   int maxCharsPerLine = 320 / charW;
@@ -167,7 +181,6 @@ void typeText(String text, int size, int r, int g, int b, String align) {
     if (startX < 0) startX = 0;
     
     tft.setCursor(startX, startY + (i * charH) + (i * 4)); 
-    
     for (int c = 0; c < line.length(); c++) {
       tft.print(line.charAt(c));
       delay(35);
@@ -231,7 +244,19 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
-  pinMode(9, INPUT_PULLUP);
+  // Initialize Buttons
+  pinMode(BTN_B3, INPUT_PULLUP);
+  pinMode(BTN_B4, INPUT_PULLUP);
+
+  Wire.begin(I2C_SDA, I2C_SCL, 100000);
+  Wire.beginTransmission(PCF8574_ADDR);
+  if (Wire.endTransmission() == 0) {
+    pcf_ready = true;
+    // Set all PCF pins to HIGH (input mode)
+    Wire.beginTransmission(PCF8574_ADDR);
+    Wire.write(0xFF);
+    Wire.endTransmission();
+  }
 
   strip.begin();
   strip.setBrightness(led_brightness);
@@ -244,8 +269,6 @@ void setup() {
   drawBootScreen();
 }
 
-unsigned long last_b4 = 0;
-
 void loop() {
   if (Serial.available()) {
     String data = Serial.readStringUntil('\n');
@@ -255,8 +278,52 @@ void loop() {
 
   updateLEDs();
 
-  if (digitalRead(9) == LOW && millis() - last_b4 > 500) {
-    last_b4 = millis();
+  // Read Buttons
+  bool curr_b1 = false;
+  bool curr_b2 = false;
+  bool curr_b3 = digitalRead(BTN_B3) == LOW;
+  bool curr_b4 = digitalRead(BTN_B4) == LOW;
+
+  if (pcf_ready) {
+    Wire.requestFrom((uint16_t)PCF8574_ADDR, (uint8_t)1);
+    if (Wire.available()) {
+      uint8_t pcf_port = Wire.read();
+      curr_b1 = (pcf_port & (1 << 1)) == 0;
+      curr_b2 = (pcf_port & (1 << 2)) == 0;
+      curr_b3 = curr_b3 || ((pcf_port & (1 << 3)) == 0);
+    }
+  }
+
+  if (curr_b1 && !state_b1) {
+    Serial.println("{\"event\": \"button_press\", \"button\": \"B1\"}");
+    led_r = random(255); led_g = random(255); led_b = random(255);
+    if (current_pattern == "Solid") {
+      for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
+      strip.show();
+    }
+  }
+  if (curr_b2 && !state_b2) {
+    Serial.println("{\"event\": \"button_press\", \"button\": \"B2\"}");
+    if (current_pattern == "Solid") {
+      current_pattern = "Rainbow";
+    }
+    else if (current_pattern == "Rainbow") {
+      current_pattern = "Cylon";
+    }
+    else {
+      current_pattern = "Solid";
+      for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
+      strip.show();
+    }
+  }
+  if (curr_b3 && !state_b3) {
+    Serial.println("{\"event\": \"button_press\", \"button\": \"B3\"}");
+    // Demo action for B3: Display text
+    typeText("Button 3 Pressed!", 3, 255, 255, 0, "center");
+  }
+  if (curr_b4 && !state_b4) {
+    Serial.println("{\"event\": \"button_press\", \"button\": \"B4\"}");
+    // B4 Laser tag
     strip.setBrightness(255);
     for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(255, 0, 0));
     strip.show();
@@ -267,5 +334,11 @@ void loop() {
       strip.show();
     }
   }
+
+  state_b1 = curr_b1;
+  state_b2 = curr_b2;
+  state_b3 = curr_b3;
+  state_b4 = curr_b4;
+
   delay(10);
 }
