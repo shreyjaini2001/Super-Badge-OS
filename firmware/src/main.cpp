@@ -5,6 +5,8 @@
 #include <SPI.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
+#include <IRremote.hpp>
+#include "tvbgone.h"
 
 #define LED_PIN     8
 #define NUM_LEDS    16
@@ -248,6 +250,13 @@ void setup() {
   pinMode(BTN_B3, INPUT_PULLUP);
   pinMode(BTN_B4, INPUT_PULLUP);
 
+  pinMode(2, OUTPUT);
+  pinMode(3, OUTPUT);
+  pinMode(5, OUTPUT);
+  digitalWrite(2, HIGH);
+  digitalWrite(3, HIGH);
+  digitalWrite(5, HIGH);
+
   Wire.begin(I2C_SDA, I2C_SCL, 100000);
   Wire.beginTransmission(PCF8574_ADDR);
   if (Wire.endTransmission() == 0) {
@@ -296,30 +305,32 @@ void loop() {
 
   if (curr_b1 && !state_b1) {
     Serial.println("{\"event\": \"button_press\", \"button\": \"B1\"}");
-    led_r = random(255); led_g = random(255); led_b = random(255);
-    if (current_pattern == "Solid") {
-      for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
-      strip.show();
-    }
+    tft.fillScreen(ST77XX_BLACK);
+    typeText("TVB-GONE (GPIO 2)", 3, 255, 0, 0, "center");
+    strip.setBrightness(255);
+    for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(255, 0, 0));
+    strip.show();
+    fire_tvbgone(2);
+    tft.fillScreen(ST77XX_BLACK);
   }
   if (curr_b2 && !state_b2) {
     Serial.println("{\"event\": \"button_press\", \"button\": \"B2\"}");
-    if (current_pattern == "Solid") {
-      current_pattern = "Rainbow";
-    }
-    else if (current_pattern == "Rainbow") {
-      current_pattern = "Cylon";
-    }
-    else {
-      current_pattern = "Solid";
-      for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
-      strip.show();
-    }
+    tft.fillScreen(ST77XX_BLACK);
+    typeText("TVB-GONE (GPIO 5)", 3, 255, 0, 0, "center");
+    strip.setBrightness(255);
+    for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(0, 0, 255));
+    strip.show();
+    fire_tvbgone(5);
+    tft.fillScreen(ST77XX_BLACK);
   }
   if (curr_b3 && !state_b3) {
     Serial.println("{\"event\": \"button_press\", \"button\": \"B3\"}");
-    // Demo action for B3: Display text
-    typeText("Button 3 Pressed!", 3, 255, 255, 0, "center");
+    tft.fillScreen(ST77XX_BLACK);
+    typeText("PULSING GPIO 5", 3, 255, 255, 255, "center");
+    digitalWrite(5, HIGH);
+    delay(500);
+    digitalWrite(5, LOW);
+    tft.fillScreen(ST77XX_BLACK);
   }
   if (curr_b4 && !state_b4) {
     Serial.println("{\"event\": \"button_press\", \"button\": \"B4\"}");

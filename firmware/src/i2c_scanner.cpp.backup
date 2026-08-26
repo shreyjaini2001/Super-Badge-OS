@@ -1,0 +1,49 @@
+#include <Arduino.h>
+#include <Wire.h>
+
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+  Serial.println("I2C Scanner starting...");
+
+  int valid_sda = -1;
+  int valid_scl = -1;
+  int pcf_addr = -1;
+
+  int pins[] = {2, 3, 4, 5, 9, 10, 20}; // Common available C3 pins
+
+  for (int i = 0; i < 7; i++) {
+    for (int j = 0; j < 7; j++) {
+      if (i == j) continue;
+      
+      int sda = pins[i];
+      int scl = pins[j];
+
+      Wire.begin(sda, scl);
+      
+      for(uint8_t address = 1; address < 127; address++ ) {
+        Wire.beginTransmission(address);
+        byte error = Wire.endTransmission();
+
+        if (error == 0) {
+          Serial.printf("Found I2C device at 0x%02X with SDA=%d, SCL=%d\n", address, sda, scl);
+          valid_sda = sda;
+          valid_scl = scl;
+          pcf_addr = address;
+        }
+      }
+      // Need to reset wire for next loop, but Wire.end() isn't always reliable.
+      // This is a rough scan.
+    }
+  }
+  
+  if (valid_sda != -1) {
+    Serial.printf("\nSUCCESS: PCF8574 is on SDA=%d, SCL=%d (Address 0x%02X)\n", valid_sda, valid_scl, pcf_addr);
+  } else {
+    Serial.println("\nFAILED to find I2C device.");
+  }
+}
+
+void loop() {
+  delay(100);
+}
