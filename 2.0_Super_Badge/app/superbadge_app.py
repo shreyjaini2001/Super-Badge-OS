@@ -260,35 +260,87 @@ class SuperBadgeApp(ctk.CTk):
 
     def setup_totp_tab(self):
         f = self.tabs["totp"]
-        ctk.CTkLabel(f, text="TOTP Authenticator", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(30, 10))
-        ctk.CTkLabel(f, text="Add a new 2FA Token to your badge.").pack(pady=5)
+        ctk.CTkLabel(f, text="TOTP Authenticator (6 Slots)", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 5))
         
+        # Display current slots
+        self.slot_labels = []
+        list_frame = ctk.CTkFrame(f)
+        list_frame.pack(pady=5, padx=20, fill="x")
+        
+        ctk.CTkLabel(list_frame, text="Current Slots:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, pady=5)
+        
+        for i in range(6):
+            btn_name = "B1" if i < 2 else "B2" if i < 4 else "B3"
+            lbl = ctk.CTkLabel(list_frame, text=f"Slot {i+1} ({btn_name}): [Empty]")
+            lbl.grid(row=i//2 + 1, column=i%2, padx=20, pady=2, sticky="w")
+            self.slot_labels.append(lbl)
+            
+        ctk.CTkButton(list_frame, text="Refresh List", command=self.refresh_totps, width=120).grid(row=4, column=0, columnspan=2, pady=10)
+
+        # Form to add/delete
         form = ctk.CTkFrame(f)
-        form.pack(pady=10, padx=20, fill="x")
+        form.pack(pady=5, padx=20, fill="x")
         
-        ctk.CTkLabel(form, text="Account Name (e.g. GitHub):").pack(pady=(10,0))
-        self.totp_name_entry = ctk.CTkEntry(form, width=300)
+        ctk.CTkLabel(form, text="Manage Slot:").pack(pady=(5,0))
+        self.totp_slot_var = ctk.StringVar(value="Slot 1 (B1)")
+        self.totp_slot_menu = ctk.CTkOptionMenu(form, variable=self.totp_slot_var, values=[
+            "Slot 1 (B1)", "Slot 2 (B1)", "Slot 3 (B2)", "Slot 4 (B2)", "Slot 5 (B3)", "Slot 6 (B3)"
+        ])
+        self.totp_slot_menu.pack(pady=5)
+        
+        ctk.CTkLabel(form, text="Account Name:").pack(pady=(5,0))
+        self.totp_name_entry = ctk.CTkEntry(form, width=250)
         self.totp_name_entry.pack(pady=5)
         
-        ctk.CTkLabel(form, text="Base32 Secret (e.g. JBSWY3DPEHPK3PXP):").pack(pady=(10,0))
-        self.totp_secret_entry = ctk.CTkEntry(form, width=300)
+        ctk.CTkLabel(form, text="Base32 Secret:").pack(pady=(5,0))
+        self.totp_secret_entry = ctk.CTkEntry(form, width=250)
         self.totp_secret_entry.pack(pady=5)
         
-        ctk.CTkButton(form, text="Save to Badge", command=self.add_totp).pack(pady=15)
+        btn_frame = ctk.CTkFrame(form, fg_color="transparent")
+        btn_frame.pack(pady=10)
+        ctk.CTkButton(btn_frame, text="Save to Slot", command=self.add_totp, fg_color="green", hover_color="darkgreen", width=120).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Delete Slot", command=self.delete_totp, fg_color="red", hover_color="darkred", width=120).pack(side="left", padx=10)
         
         time_frame = ctk.CTkFrame(f)
-        time_frame.pack(pady=10, padx=20, fill="x")
-        ctk.CTkLabel(time_frame, text="The badge needs to know the current time to generate tokens.").pack(pady=(10,5))
-        ctk.CTkButton(time_frame, text="Sync Time Now", fg_color="green", hover_color="darkgreen", command=self.sync_time).pack(pady=10)
+        time_frame.pack(pady=5, padx=20, fill="x")
+        ctk.CTkButton(time_frame, text="Sync Time Now", fg_color="blue", hover_color="darkblue", command=self.sync_time).pack(pady=10)
+
+    def refresh_totps(self):
+        self.send_badge_cmd("get_totps")
+        if not self.ser: return
+        import time, json
+        t0 = time.time()
+        while time.time() - t0 < 1.0:
+            if self.ser.in_waiting:
+                resp = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                if not resp: continue
+                try:
+                    data = json.loads(resp)
+                    if data.get("event") == "totp_list":
+                        slots = data.get("data", [])
+                        for i, name in enumerate(slots):
+                            btn_name = "B1" if i < 2 else "B2" if i < 4 else "B3"
+                            disp = name if name else "[Empty]"
+                            self.slot_labels[i].configure(text=f"Slot {i+1} ({btn_name}): {disp}")
+                        break
+                except json.JSONDecodeError:
+                    pass
+
+    def delete_totp(self):
+        slot_idx = int(self.totp_slot_var.get().split(" ")[1]) - 1
+        self.send_badge_cmd("delete_totp", {"slot": slot_idx})
+        self.refresh_totps()
 
     def add_totp(self):
+        slot_idx = int(self.totp_slot_var.get().split(" ")[1]) - 1
         name = self.totp_name_entry.get()
         secret = self.totp_secret_entry.get().replace(" ", "").upper()
         if not name or not secret:
             print("Name and Secret required!")
             return
-        self.send_badge_cmd("add_totp", {"name": name, "secret": secret})
+        self.send_badge_cmd("add_totp", {"slot": slot_idx, "name": name, "secret": secret})
         self.sync_time()
+        self.refresh_totps()
 
     def sync_time(self):
         import time

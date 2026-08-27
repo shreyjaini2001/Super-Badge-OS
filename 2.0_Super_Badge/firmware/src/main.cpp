@@ -54,8 +54,9 @@ String text_align = "center";
 bool show_image_mode = false;
 
 // TOTP State
-String totp_name = "";
-String totp_secret = "";
+String totp_names[6];
+String totp_secrets[6];
+int current_totp_slot = -1;
 unsigned long time_offset = 0;
 String last_totp_code = "";
 File imgFile;
@@ -129,7 +130,7 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 void updateLEDs() {
-  if (current_state == MODE_TOTP && time_offset > 0 && totp_secret != "") {
+  if (current_state == MODE_TOTP && time_offset > 0 && current_totp_slot != -1 && totp_secrets[current_totp_slot] != "") {
       unsigned long current_time = (millis() / 1000) + time_offset;
       int seconds_left = 30 - (current_time % 30);
       int leds_to_light = (seconds_left * NUM_LEDS) / 30;
@@ -352,18 +353,31 @@ void render_totp() {
         tft.setCursor(20, 170);
         tft.println("App to Sync Time.");
     } 
-    else if (totp_secret == "") {
+    else if (current_totp_slot == -1) {
+        tft.setTextSize(2);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setCursor(20, 40);
+        tft.println("Select Account:");
+        tft.setTextColor(ST77XX_CYAN);
+        tft.setCursor(20, 90);
+        tft.println("B1: Slots 1 & 2");
+        tft.setCursor(20, 130);
+        tft.println("B2: Slots 3 & 4");
+        tft.setCursor(20, 170);
+        tft.println("B3: Slots 5 & 6");
+    }
+    else if (totp_secrets[current_totp_slot] == "") {
         tft.setTextSize(2);
         tft.setTextColor(ST77XX_RED);
         tft.setCursor(20, 100);
-        tft.println("No TOTP Token Found!");
+        tft.println("Slot " + String(current_totp_slot + 1) + " Empty");
         tft.setCursor(20, 140);
         tft.setTextColor(ST77XX_WHITE);
-        tft.println("Add one via the App.");
+        tft.println("Add via the App.");
     } 
     else {
         uint8_t hmacKey[40];
-        int keyLen = base32_decode(totp_secret.c_str(), hmacKey, sizeof(hmacKey));
+        int keyLen = base32_decode(totp_secrets[current_totp_slot].c_str(), hmacKey, sizeof(hmacKey));
         
         TOTP totp(hmacKey, keyLen);
         unsigned long current_time = (millis() / 1000) + time_offset;
@@ -372,10 +386,11 @@ void render_totp() {
         
         tft.setTextSize(3);
         tft.setTextColor(ST77XX_GREEN);
-        int name_x = (SCREEN_W - (totp_name.length() * 18)) / 2;
+        String t_name = totp_names[current_totp_slot];
+        int name_x = (SCREEN_W - (t_name.length() * 18)) / 2;
         if(name_x < 0) name_x = 0;
         tft.setCursor(name_x, 50);
-        tft.println(totp_name);
+        tft.println(t_name);
         
         tft.setTextSize(5);
         tft.setTextColor(ST77XX_WHITE);
@@ -423,8 +438,10 @@ void load_state() {
     
     show_image_mode = prefs.getBool("img_mode", false);
     
-    totp_name = prefs.getString("totp_name", "");
-    totp_secret = prefs.getString("totp_sec", "");
+    for(int i=0; i<6; i++) {
+        totp_names[i] = prefs.getString(("t_n_" + String(i)).c_str(), "");
+        totp_secrets[i] = prefs.getString(("t_s_" + String(i)).c_str(), "");
+    }
     
     // Find pattern index
     for(int i=0; i<PATTERN_COUNT; i++) {
@@ -455,8 +472,10 @@ void save_state() {
     
     prefs.putBool("img_mode", show_image_mode);
     
-    prefs.putString("totp_name", totp_name);
-    prefs.putString("totp_sec", totp_secret);
+    for(int i=0; i<6; i++) {
+        prefs.putString(("t_n_" + String(i)).c_str(), totp_names[i]);
+        prefs.putString(("t_s_" + String(i)).c_str(), totp_secrets[i]);
+    }
     
     prefs.end();
 }
@@ -570,12 +589,36 @@ void processCommand(String data) {
         if (current_state == MODE_TOTP) render_totp();
     }
     else if (cmd == "add_totp") {
-        totp_name = doc["args"]["name"].as<String>();
-        totp_secret = doc["args"]["secret"].as<String>();
-        save_state();
+        int slot = doc["args"]["slot"].as<int>();
+        if(slot >= 0 && slot < 6) {
+            totp_names[slot] = doc["args"]["name"].as<String>();
+            totp_secrets[slot] = doc["args"]["secret"].as<String>();
+            save_state();
+        }
         Serial.println("{\"status\": \"ok\", \"cmd\": \"add_totp\"}");
         sendBLE("{\"status\": \"ok\", \"cmd\": \"add_totp\"}");
         if (current_state == MODE_TOTP) render_totp();
+    }
+    else if (cmd == "delete_totp") {
+        int slot = doc["args"]["slot"].as<int>();
+        if(slot >= 0 && slot < 6) {
+            totp_names[slot] = "";
+            totp_secrets[slot] = "";
+            save_state();
+        }
+        Serial.println("{\"status\": \"ok\", \"cmd\": \"delete_totp\"}");
+        sendBLE("{\"status\": \"ok\", \"cmd\": \"delete_totp\"}");
+        if (current_state == MODE_TOTP) render_totp();
+    }
+    else if (cmd == "get_totps") {
+        String json = "{\"event\": \"totp_list\", \"data\": [";
+        for(int i=0; i<6; i++) {
+            json += "\"" + totp_names[i] + "\"";
+            if(i < 5) json += ",";
+        }
+        json += "]}";
+        Serial.println(json);
+        sendBLE(json);
     }
 }
 
@@ -634,9 +677,9 @@ void loop() {
     updateLEDs();
 
     // Check if TOTP code changed to re-render screen
-    if (current_state == MODE_TOTP && time_offset > 0 && totp_secret != "") {
+    if (current_state == MODE_TOTP && time_offset > 0 && current_totp_slot != -1 && totp_secrets[current_totp_slot] != "") {
         uint8_t hmacKey[40];
-        int keyLen = base32_decode(totp_secret.c_str(), hmacKey, sizeof(hmacKey));
+        int keyLen = base32_decode(totp_secrets[current_totp_slot].c_str(), hmacKey, sizeof(hmacKey));
         TOTP totp(hmacKey, keyLen);
         unsigned long current_time = (millis() / 1000) + time_offset;
         char* new_code = totp.getCode(current_time);
@@ -665,6 +708,10 @@ void loop() {
             menu_index--;
             if(menu_index < 0) menu_index = MENU_COUNT - 1;
             render_menu();
+        } else if (current_state == MODE_TOTP) {
+            if (current_totp_slot == 0) current_totp_slot = 1;
+            else current_totp_slot = 0;
+            render_totp();
         } else if (current_state == MODE_NAMETAG) {
             show_image_mode = true;
             save_state();
@@ -686,6 +733,10 @@ void loop() {
             menu_index++;
             if(menu_index >= MENU_COUNT) menu_index = 0;
             render_menu();
+        } else if (current_state == MODE_TOTP) {
+            if (current_totp_slot == 2) current_totp_slot = 3;
+            else current_totp_slot = 2;
+            render_totp();
         } else if (current_state == MODE_NAMETAG) {
             show_image_mode = false;
             save_state();
@@ -706,8 +757,15 @@ void loop() {
         if (current_state == MODE_MENU) {
             if (menu_index == 0) switch_state(MODE_NAMETAG);
             else if (menu_index == 1) switch_state(MODE_TVBGONE);
-            else if (menu_index == 2) switch_state(MODE_TOTP);
+            else if (menu_index == 2) {
+                current_totp_slot = -1; // reset slot selection
+                switch_state(MODE_TOTP);
+            }
             else if (menu_index == 3) switch_state(MODE_GAMES);
+        } else if (current_state == MODE_TOTP) {
+            if (current_totp_slot == 4) current_totp_slot = 5;
+            else current_totp_slot = 4;
+            render_totp();
         } else if (current_state == MODE_NAMETAG) {
             pattern_index = (pattern_index + 1) % PATTERN_COUNT;
             current_pattern = patterns[pattern_index];
