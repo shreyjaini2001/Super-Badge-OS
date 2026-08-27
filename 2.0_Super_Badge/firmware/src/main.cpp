@@ -661,6 +661,11 @@ void processCommand(String data) {
         Serial.println(json);
         sendBLE(json);
     }
+    else if (cmd == "welcome") {
+        switch_state(MODE_WELCOME);
+        Serial.println("{\"status\": \"ok\"}");
+        sendBLE("{\"status\": \"ok\"}");
+    }
     else if (cmd == "set_pin") {
         badge_pin = doc["args"]["pin"].as<String>();
         save_state();
@@ -872,7 +877,9 @@ void loop() {
         }
     }
     if (curr_b4 && !state_b4) {
-        if (current_state != MODE_MENU && current_state != MODE_GAMES) {
+        if (current_state == MODE_MENU) {
+            switch_state(MODE_WELCOME);
+        } else if (current_state != MODE_GAMES) {
             switch_state(MODE_MENU);
         }
     }

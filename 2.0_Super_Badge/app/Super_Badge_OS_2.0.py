@@ -62,8 +62,11 @@ class SuperBadgeApp(ctk.CTk):
         self.btn_games = ctk.CTkButton(self.sidebar_frame, text="Games", command=lambda: self.select_tab("games"))
         self.btn_games.grid(row=4, column=0, padx=20, pady=10)
 
+        self.btn_security = ctk.CTkButton(self.sidebar_frame, text="Security (PIN)", command=lambda: self.select_tab("security"))
+        self.btn_security.grid(row=5, column=0, padx=20, pady=10)
+
         self.btn_home = ctk.CTkButton(self.sidebar_frame, text="🏠 Home Screen", fg_color="#2b7a4b", hover_color="#1e5434", command=self.go_home)
-        self.btn_home.grid(row=5, column=0, padx=20, pady=20)
+        self.btn_home.grid(row=6, column=0, padx=20, pady=20)
 
         # Appearance Mode
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
@@ -380,6 +383,40 @@ class SuperBadgeApp(ctk.CTk):
         import time
         current_unix = int(time.time())
         self.send_badge_cmd("sync_time", {"t": current_unix})
+
+
+    def setup_security_tab(self):
+        f = self.tabs["security"]
+        ctk.CTkLabel(f, text="Badge Lock Screen", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(30, 10))
+        ctk.CTkLabel(f, text="Secure your badge and 2FA codes with a button-combination PIN.").pack(pady=(0, 20))
+        
+        form = ctk.CTkFrame(f)
+        form.pack(pady=10, padx=40, fill="x")
+        
+        ctk.CTkLabel(form, text="New Security PIN:", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
+        ctk.CTkLabel(form, text="Must only contain digits 1, 2, 3, or 4 (corresponding to badge buttons). Max 8 digits.").pack()
+        
+        self.pin_entry = ctk.CTkEntry(form, placeholder_text="e.g. 1423", width=200, justify="center")
+        self.pin_entry.pack(pady=15)
+        
+        btn_frame = ctk.CTkFrame(form, fg_color="transparent")
+        btn_frame.pack(pady=(0, 20))
+        
+        ctk.CTkButton(btn_frame, text="Set PIN", fg_color="green", hover_color="darkgreen", command=self.set_pin).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Remove PIN", fg_color="red", hover_color="darkred", command=self.clear_pin).pack(side="left", padx=10)
+
+    def set_pin(self):
+        pin = self.pin_entry.get()
+        if not all(c in "1234" for c in pin):
+            print("PIN must only contain digits 1, 2, 3, or 4!")
+            return
+        self.send_badge_cmd("set_pin", {"pin": pin})
+        print(f"Set PIN to {pin}")
+
+    def clear_pin(self):
+        self.send_badge_cmd("set_pin", {"pin": ""})
+        self.pin_entry.delete(0, 'end')
+        print("Removed PIN")
 
     def setup_games_tab(self):
         f = self.tabs["games"]
