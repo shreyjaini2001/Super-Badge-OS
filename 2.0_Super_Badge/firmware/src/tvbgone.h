@@ -58,6 +58,7 @@ void fire_tvbgone(int tx_pin) {
 
   for (uint8_t i = 0; i < num_codes; i++) {
     // Check if B3 or B4 is pressed to stop
+    // Check if B3 or B4 is pressed to stop
     if (digitalRead(10) == LOW || digitalRead(9) == LOW) {
        delay(500); // debounce
        break;
@@ -69,13 +70,13 @@ void fire_tvbgone(int tx_pin) {
     tft.setTextColor(ST77XX_YELLOW);
     tft.printf("Code: %d / %d", i+1, num_codes);
 
-    const struct IrCode* data_ptr = (const struct IrCode*)pgm_read_word(&NApowerCodes[i]);
+    const struct IrCode* data_ptr = (const struct IrCode*)pgm_read_ptr(&NApowerCodes[i]);
 
     uint8_t freq_val = pgm_read_byte(&data_ptr->timer_val);
     uint8_t numpairs = pgm_read_byte(&data_ptr->numpairs);
     uint8_t bitcompression = pgm_read_byte(&data_ptr->bitcompression);
-    const uint16_t* time_ptr = (const uint16_t*)pgm_read_word(&data_ptr->times);
-    code_ptr = (const uint8_t*)pgm_read_word(&data_ptr->codes);
+    const uint16_t* time_ptr = (const uint16_t*)pgm_read_ptr(&data_ptr->times);
+    code_ptr = (const uint8_t*)pgm_read_ptr(&data_ptr->codes);
 
     uint32_t freq_hz = 1000000 / (freq_val + 1);
     ledcSetup(0, freq_hz, 8);
