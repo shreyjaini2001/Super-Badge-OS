@@ -306,11 +306,11 @@ void render_welcome_screen() {
     tft.drawRect(5, 5, 310, 230, ST77XX_CYAN);
     tft.drawRect(8, 8, 304, 224, ST77XX_MAGENTA);
     tft.setTextSize(4); tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(80, 60); tft.print("WELCOME");
+    tft.setCursor(76, 60); tft.print("WELCOME");
     tft.setTextSize(2); tft.setTextColor(ST77XX_CYAN);
-    tft.setCursor(70, 120); tft.print("Super Badge OS");
+    tft.setCursor(76, 120); tft.print("Super Badge OS");
     tft.setTextSize(1); tft.setTextColor(ST77XX_MAGENTA);
-    tft.setCursor(100, 150); tft.print("(C) Shreyjain 2026");
+    tft.setCursor(106, 150); tft.print("(C) Shreyjain 2026");
 }
 void render_menu() {
     tft.fillScreen(ST77XX_BLACK);
@@ -738,7 +738,7 @@ void loop() {
     if (current_state == MODE_WELCOME) {
         if ((millis() / 500) % 2 == 0) tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
         else tft.setTextColor(ST77XX_BLACK, ST77XX_BLACK);
-        tft.setTextSize(1); tft.setCursor(80, 200);
+        tft.setTextSize(1); tft.setCursor(85, 200);
         tft.print("PRESS ANY BUTTON TO BEGIN");
     }
     }
