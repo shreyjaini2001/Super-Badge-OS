@@ -368,20 +368,27 @@ void loop_flappy() {
 }
 
 // --- STATE MANAGEMENT ---
+bool btn1_prev = false;
+bool btn2_prev = false;
+bool btn3_prev = false;
+bool btn4_prev = false;
+
+
+extern bool btn1_prev, btn2_prev, btn3_prev, btn4_prev;
 
 void switch_game_state(GameState state) {
     current_game_state = state;
-    if (state == GAME_MENU) render_games_menu();
+    if (state == GAME_MENU) {
+        btn1_prev = true; btn2_prev = true; btn3_prev = true; btn4_prev = true;
+        render_games_menu();
+    }
     else if (state == GAME_PONG) setup_pong();
     else if (state == GAME_SNAKE) setup_snake();
     else if (state == GAME_SIMON) setup_simon();
     else if (state == GAME_DOOM) setup_flappy();
 }
 
-bool btn3_prev = false;
-bool btn1_prev = false;
-bool btn2_prev = false;
-bool btn4_prev = false;
+
 
 void loop_games() {
     if (state_b4 && !btn4_prev) {
