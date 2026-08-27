@@ -1,0 +1,396 @@
+#include <Arduino.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7789.h>
+#include <Adafruit_NeoPixel.h>
+#include <SPI.h>
+#include <Preferences.h>
+#include <LittleFS.h>
+#include <libb64/cdecode.h>
+
+// --- Hardware Pin Map ---
+#define LED_PIN     8
+#define NUM_LEDS    16
+
+#define TFT_CS      1
+#define TFT_DC      0
+#define TFT_RST     21
+#define TFT_MOSI    7
+#define TFT_SCLK    6
+
+#define SCREEN_W    320
+#define SCREEN_H    240
+
+Preferences prefs;
+
+// ---------------------------------------------------------------------------
+// Custom display subclass
+// ---------------------------------------------------------------------------
+class BadgeDisplay : public Adafruit_ST7789 {
+public:
+  BadgeDisplay(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst)
+      : Adafruit_ST7789(cs, dc, mosi, sclk, rst) {}
+
+  void begin() {
+    init(240, 320);
+    _colstart  = 0;
+    _rowstart  = 0;
+    _colstart2 = 0;
+    _rowstart2 = 0;
+    setRotation(1);
+    invertDisplay(true);
+
+    startWrite();
+    setAddrWindow(0, 0, 240, 320);
+    for (uint32_t i = 0; i < 240UL * 320UL; i++) {
+      SPI_WRITE16(0x0000);
+    }
+    endWrite();
+
+    _width  = SCREEN_W;
+    _height = SCREEN_H;
+  }
+};
+
+BadgeDisplay tft(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// --- State Variables ---
+String current_pattern = "Solid";
+int led_r = 0, led_g = 0, led_b = 255;
+String last_msg = "";
+int last_text_size = 3;
+int last_text_r = 255, last_text_g = 255, last_text_b = 255;
+String last_text_align = "center";
+bool showing_image = false;
+
+// --- Function Prototypes ---
+void drawBootScreen();
+void drawWordWrappedText(String text, int size, int r, int g, int b, String align);
+void drawSavedImage();
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  // Initialize LittleFS and Preferences
+  LittleFS.begin(true);
+  prefs.begin("badge", false);
+
+  // Load Saved State
+  current_pattern = prefs.getString("pattern", "Solid");
+  led_r = prefs.getInt("led_r", 0);
+  led_g = prefs.getInt("led_g", 0);
+  led_b = prefs.getInt("led_b", 255);
+  
+  last_msg = prefs.getString("msg", "");
+  last_text_size = prefs.getInt("t_size", 3);
+  last_text_r = prefs.getInt("t_r", 255);
+  last_text_g = prefs.getInt("t_g", 255);
+  last_text_b = prefs.getInt("t_b", 255);
+  last_text_align = prefs.getString("t_align", "center");
+  showing_image = prefs.getBool("show_img", false);
+
+  // Init LEDs
+  strip.begin();
+  strip.setBrightness(80);
+  strip.show();
+
+  // Init Display
+  tft.begin();
+  
+  // Restore last screen state
+  if (showing_image && LittleFS.exists("/bg.bin")) {
+    drawSavedImage();
+  } else if (last_msg != "") {
+    drawWordWrappedText(last_msg, last_text_size, last_text_r, last_text_g, last_text_b, last_text_align);
+  } else {
+    drawBootScreen();
+  }
+
+  Serial.println("Super Badge OS booted OK.");
+}
+
+void drawBootScreen() {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawRect(0, 0, SCREEN_W, SCREEN_H, ST77XX_GREEN);
+
+  tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  tft.setTextSize(3);
+  tft.setCursor(20, 15);
+  tft.println("SUPER BADGE OS");
+
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  tft.setTextSize(2);
+  tft.setCursor(20, 70);
+  tft.println("Status : ONLINE");
+  tft.setCursor(20, 95);
+  tft.println("LEDs   : 16");
+  tft.setCursor(20, 120);
+  tft.println("Screen : 320x240");
+
+  tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(20, 200);
+  tft.println("DEF CON 34 - Crypto Village");
+  tft.setCursor(20, 215);
+  tft.println("(c) ShreyJain");
+}
+
+void drawWordWrappedText(String text, int size, int r, int g, int b, String align) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextSize(size);
+  tft.setTextColor(tft.color565(r, g, b), ST77XX_BLACK);
+  
+  // Calculate char width based on size (Adafruit font is 5x7, with 1px spacing = 6x8)
+  int char_w = 6 * size;
+  int char_h = 8 * size;
+  int max_chars_per_line = SCREEN_W / char_w;
+  
+  // Custom word wrapper to prevent cutting words
+  String lines[30];
+  int line_cnt = 0;
+  
+  int start_idx = 0;
+  while (start_idx < text.length() && line_cnt < 30) {
+    int end_idx = start_idx + max_chars_per_line;
+    if (end_idx >= text.length()) {
+      lines[line_cnt++] = text.substring(start_idx);
+      break;
+    }
+    
+    // Find last space within the limit
+    int space_idx = -1;
+    for (int i = end_idx; i >= start_idx; i--) {
+      if (text.charAt(i) == ' ') {
+        space_idx = i;
+        break;
+      }
+    }
+    
+    if (space_idx != -1) {
+      lines[line_cnt++] = text.substring(start_idx, space_idx);
+      start_idx = space_idx + 1;
+    } else {
+      // Force break if word is longer than line
+      lines[line_cnt++] = text.substring(start_idx, end_idx);
+      start_idx = end_idx;
+    }
+  }
+  
+  // Draw lines
+  int total_height = line_cnt * (char_h + 4);
+  int start_y = (SCREEN_H - total_height) / 2;
+  if (start_y < 10) start_y = 10;
+  
+  for (int i = 0; i < line_cnt; i++) {
+    int line_w = lines[i].length() * char_w;
+    int x = 10; // default left
+    if (align == "center") {
+      x = (SCREEN_W - line_w) / 2;
+    }
+    tft.setCursor(x, start_y + i * (char_h + 4));
+    tft.println(lines[i]);
+  }
+}
+
+void drawSavedImage() {
+  File file = LittleFS.open("/bg.bin", "r");
+  if (!file) return;
+  
+  uint16_t buf[320];
+  for (int y = 0; y < 240; y++) {
+    if (file.available()) {
+      file.read((uint8_t*)buf, 640);
+      tft.drawRGBBitmap(0, y, buf, 320, 1);
+    }
+  }
+  file.close();
+}
+
+File imgFile;
+
+void processCommand(String cmdLine) {
+  // ---- HOME SCREEN ----
+  if (cmdLine.indexOf("\"cmd\": \"home_screen\"") > 0) {
+    showing_image = false;
+    last_msg = "";
+    prefs.putBool("show_img", false);
+    prefs.putString("msg", "");
+    drawBootScreen();
+  }
+  // ---- TEXT ----
+  else if (cmdLine.indexOf("\"cmd\": \"display_text\"") > 0) {
+    int msg_start = cmdLine.indexOf("\"msg\": \"") + 8;
+    int msg_end   = cmdLine.indexOf("\"", msg_start);
+    int size_start = cmdLine.indexOf("\"size\": ") + 8;
+    int size_end = cmdLine.indexOf(",", size_start);
+    int align_start = cmdLine.indexOf("\"align\": \"") + 10;
+    int align_end = cmdLine.indexOf("\"", align_start);
+    
+    int r_start = cmdLine.indexOf("\"r\": ") + 5;
+    int r_end = cmdLine.indexOf(",", r_start);
+    int g_start = cmdLine.indexOf("\"g\": ") + 5;
+    int g_end = cmdLine.indexOf(",", g_start);
+    int b_start = cmdLine.indexOf("\"b\": ") + 5;
+    int b_end = cmdLine.indexOf(",", b_start);
+
+    if (msg_start > 8 && msg_end > msg_start) {
+      last_msg = cmdLine.substring(msg_start, msg_end);
+      if (size_start > 8) last_text_size = cmdLine.substring(size_start, size_end).toInt();
+      if (align_start > 10) last_text_align = cmdLine.substring(align_start, align_end);
+      if (r_start > 5) last_text_r = cmdLine.substring(r_start, r_end).toInt();
+      if (g_start > 5) last_text_g = cmdLine.substring(g_start, g_end).toInt();
+      if (b_start > 5) last_text_b = cmdLine.substring(b_start, b_end).toInt();
+
+      showing_image = false;
+      prefs.putBool("show_img", false);
+      prefs.putString("msg", last_msg);
+      prefs.putInt("t_size", last_text_size);
+      prefs.putInt("t_r", last_text_r);
+      prefs.putInt("t_g", last_text_g);
+      prefs.putInt("t_b", last_text_b);
+      prefs.putString("t_align", last_text_align);
+
+      drawWordWrappedText(last_msg, last_text_size, last_text_r, last_text_g, last_text_b, last_text_align);
+    }
+  }
+  // ---- IMAGE UPLOAD ----
+  else if (cmdLine.indexOf("\"cmd\": \"image_start\"") > 0) {
+    showing_image = true;
+    prefs.putBool("show_img", true);
+    imgFile = LittleFS.open("/bg.bin", "w");
+  }
+  else if (cmdLine.indexOf("\"cmd\": \"image_row\"") > 0) {
+    int y_start = cmdLine.indexOf("\"y\": ") + 5;
+    int y_end = cmdLine.indexOf(",", y_start);
+    int d_start = cmdLine.indexOf("\"data\": \"") + 9;
+    int d_end = cmdLine.indexOf("\"", d_start);
+    
+    if (y_start > 5 && d_start > 9) {
+      int y = cmdLine.substring(y_start, y_end).toInt();
+      String b64 = cmdLine.substring(d_start, d_end);
+      
+      // Decode base64 into binary array
+      base64_decodestate s;
+      base64_init_decodestate(&s);
+      int decodedLen = b64.length() * 3 / 4;
+      uint8_t* rowData = (uint8_t*)malloc(decodedLen + 1);
+      int count = base64_decode_block(b64.c_str(), b64.length(), (char*)rowData, &s);
+      
+      // Write to screen directly
+      tft.drawRGBBitmap(0, y, (uint16_t*)rowData, 320, 1);
+      
+      // Save to flash memory
+      if (imgFile) imgFile.write(rowData, decodedLen);
+      if (y == 239 && imgFile) imgFile.close();
+      
+      free(rowData);
+    }
+  }
+  // ---- LED COLOR ----
+  else if (cmdLine.indexOf("\"cmd\": \"led_color\"") > 0) {
+    int r_start = cmdLine.indexOf("\"r\": ") + 5;
+    int r_end   = cmdLine.indexOf(",", r_start);
+    int g_start = cmdLine.indexOf("\"g\": ") + 5;
+    int g_end   = cmdLine.indexOf(",", g_start);
+    int b_start = cmdLine.indexOf("\"b\": ") + 5;
+    int b_end   = cmdLine.indexOf("}", b_start);
+
+    if (r_start > 5 && g_start > 5 && b_start > 5) {
+      led_r = cmdLine.substring(r_start, r_end).toInt();
+      led_g = cmdLine.substring(g_start, g_end).toInt();
+      led_b = cmdLine.substring(b_start, b_end).toInt();
+      
+      current_pattern = "Solid";
+      prefs.putString("pattern", "Solid");
+      prefs.putInt("led_r", led_r);
+      prefs.putInt("led_g", led_g);
+      prefs.putInt("led_b", led_b);
+    }
+  }
+  // ---- LED PATTERN ----
+  else if (cmdLine.indexOf("\"cmd\": \"led_pattern\"") > 0) {
+    int type_start = cmdLine.indexOf("\"type\": \"") + 9;
+    int type_end   = cmdLine.indexOf("\"", type_start);
+    if (type_start > 9 && type_end > type_start) {
+      current_pattern = cmdLine.substring(type_start, type_end);
+      prefs.putString("pattern", current_pattern);
+    }
+  }
+}
+
+// Helper to set all LEDs
+void setAllLEDs(uint32_t color) {
+  for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, color);
+  strip.show();
+}
+
+void loop() {
+  if (Serial.available()) {
+    String data = Serial.readStringUntil('\n');
+    data.trim();
+    if (data.length() > 0) {
+      processCommand(data);
+    }
+  }
+
+  // --- LED Animations ---
+  static uint32_t t = 0;
+  t++;
+
+  if (current_pattern == "Solid") {
+    setAllLEDs(strip.Color(led_r, led_g, led_b));
+  }
+  else if (current_pattern == "Rainbow") {
+    static uint16_t hue = 0;
+    for (int i = 0; i < NUM_LEDS; i++) {
+      strip.setPixelColor(i, strip.ColorHSV(hue + (i * 65536L / NUM_LEDS)));
+    }
+    strip.show();
+    hue += 256;
+  }
+  else if (current_pattern == "Breathe") {
+    float breath = (exp(sin(millis() / 2000.0 * PI)) - 0.36787944) * 108.0;
+    strip.setBrightness((uint8_t)breath);
+    setAllLEDs(strip.Color(led_r, led_g, led_b));
+  }
+  else if (current_pattern == "Theater Chase") {
+    strip.setBrightness(80);
+    static int q = 0;
+    for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, 0);
+    for (int i = 0; i < NUM_LEDS; i = i + 3) {
+      if(i + q < NUM_LEDS) strip.setPixelColor(i + q, strip.Color(led_r, led_g, led_b));
+    }
+    strip.show();
+    q++; if (q >= 3) q = 0;
+    delay(50);
+  }
+  else if (current_pattern == "Cylon") {
+    strip.setBrightness(80);
+    static int pos = 0;
+    static int dir = 1;
+    for (int i = 0; i < NUM_LEDS; i++) strip.setPixelColor(i, 0);
+    strip.setPixelColor(pos, strip.Color(led_r, led_g, led_b));
+    strip.show();
+    pos += dir;
+    if (pos >= NUM_LEDS - 1 || pos <= 0) dir = -dir;
+    delay(50);
+  }
+  else if (current_pattern == "Twinkle") {
+    strip.setBrightness(80);
+    setAllLEDs(0);
+    strip.setPixelColor(random(NUM_LEDS), strip.Color(led_r, led_g, led_b));
+    strip.show();
+    delay(50);
+  }
+  else if (current_pattern == "Sparkle") {
+    strip.setBrightness(80);
+    int p = random(NUM_LEDS);
+    strip.setPixelColor(p, strip.Color(led_r, led_g, led_b));
+    strip.show();
+    delay(20);
+    strip.setPixelColor(p, 0);
+  }
+  
+  delay(10);
+}
