@@ -383,7 +383,7 @@ extern bool btn1_prev, btn2_prev, btn3_prev, btn4_prev;
 void switch_game_state(GameState state) {
     current_game_state = state;
     if (state == GAME_MENU) {
-        btn1_prev = true; btn2_prev = true; btn3_prev = true; btn4_prev = true;
+        btn1_prev = true; btn2_prev = true; flappy_b3_prev = true; btn4_prev = true;
         render_games_menu(true);
     }
     else if (state == GAME_PONG) setup_pong();
