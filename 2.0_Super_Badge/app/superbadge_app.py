@@ -88,7 +88,7 @@ class SuperBadgeApp(ctk.CTk):
         self.setup_tv_tab()
         
         self.tabs["lasertag"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.setup_lasertag_tab()
+        self.setup_totp_tab()
         
         self.tabs["games"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_games_tab()
@@ -258,18 +258,42 @@ class SuperBadgeApp(ctk.CTk):
         btn_fire.pack(pady=30)
         ctk.CTkLabel(f, text="Warning: This will cycle through hundreds of TV power-off codes.").pack()
 
-    def setup_lasertag_tab(self):
-        f = self.tabs["lasertag"]
-        ctk.CTkLabel(f, text="Laser Tag Mode", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(30, 20))
-        team_frame = ctk.CTkFrame(f)
-        team_frame.pack(pady=10)
-        ctk.CTkLabel(team_frame, text="Select Team: ").pack(side="left", padx=10)
-        ctk.CTkOptionMenu(team_frame, values=["Red Team", "Blue Team", "Green Team"], 
-                          command=lambda v: self.send_badge_cmd("lasertag_team", {"team": v})).pack(side="left")
-        btn_shoot = ctk.CTkButton(f, text="SHOOT LASER", fg_color="orange", hover_color="#cc6600",
-                                  font=ctk.CTkFont(size=20, weight="bold"), height=60, width=200,
-                                  command=lambda: self.send_badge_cmd("lasertag_fire"))
-        btn_shoot.pack(pady=30)
+    def setup_totp_tab(self):
+        f = self.tabs["totp"]
+        ctk.CTkLabel(f, text="TOTP Authenticator", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(30, 10))
+        ctk.CTkLabel(f, text="Add a new 2FA Token to your badge.").pack(pady=5)
+        
+        form = ctk.CTkFrame(f)
+        form.pack(pady=10, padx=20, fill="x")
+        
+        ctk.CTkLabel(form, text="Account Name (e.g. GitHub):").pack(pady=(10,0))
+        self.totp_name_entry = ctk.CTkEntry(form, width=300)
+        self.totp_name_entry.pack(pady=5)
+        
+        ctk.CTkLabel(form, text="Base32 Secret (e.g. JBSWY3DPEHPK3PXP):").pack(pady=(10,0))
+        self.totp_secret_entry = ctk.CTkEntry(form, width=300)
+        self.totp_secret_entry.pack(pady=5)
+        
+        ctk.CTkButton(form, text="Save to Badge", command=self.add_totp).pack(pady=15)
+        
+        time_frame = ctk.CTkFrame(f)
+        time_frame.pack(pady=10, padx=20, fill="x")
+        ctk.CTkLabel(time_frame, text="The badge needs to know the current time to generate tokens.").pack(pady=(10,5))
+        ctk.CTkButton(time_frame, text="Sync Time Now", fg_color="green", hover_color="darkgreen", command=self.sync_time).pack(pady=10)
+
+    def add_totp(self):
+        name = self.totp_name_entry.get()
+        secret = self.totp_secret_entry.get().replace(" ", "").upper()
+        if not name or not secret:
+            print("Name and Secret required!")
+            return
+        self.send_badge_cmd("add_totp", {"name": name, "secret": secret})
+        self.sync_time()
+
+    def sync_time(self):
+        import time
+        current_unix = int(time.time())
+        self.send_badge_cmd("sync_time", {"t": current_unix})
 
     def setup_games_tab(self):
         f = self.tabs["games"]

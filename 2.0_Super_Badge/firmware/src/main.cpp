@@ -9,6 +9,7 @@
 #include <SPIFFS.h>
 #include "tvbgone.h"
 #include "ble_manager.h"
+#include <TOTP.h>
 
 // --- Constants & Pins ---
 #define LED_PIN     8
@@ -52,6 +53,13 @@ int text_r = 255, text_g = 255, text_b = 255;
 String text_align = "center";
 bool show_image_mode = false;
 
+// TOTP State
+String totp_name = "";
+String totp_secret = "";
+unsigned long time_offset = 0;
+String last_totp_code = "";
+File imgFile;
+
 // App States
 enum AppState {
     MODE_MENU,
@@ -72,9 +80,9 @@ const char* menu_items[] = {
 const int MENU_COUNT = 4;
 int menu_index = 0;
 
-int pattern_index = 0;
 const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle"};
 const int PATTERN_COUNT = 7;
+int pattern_index = 0;
 
 // Function Prototypes
 void render_menu();
@@ -84,6 +92,29 @@ void render_totp();
 void render_games();
 void load_state();
 void save_state();
+
+// --- Base32 Decoder ---
+int base32_decode(const char *encoded, uint8_t *result, int bufSize) {
+    int buffer = 0;
+    int bitsLeft = 0;
+    int count = 0;
+    for (const char *ptr = encoded; count < bufSize && *ptr; ++ptr) {
+        uint8_t ch = *ptr;
+        if (ch == ' ' || ch == '-' || ch == '\r' || ch == '\n' || ch == '=') continue;
+        ch = toupper(ch);
+        int val = -1;
+        if (ch >= 'A' && ch <= 'Z') val = ch - 'A';
+        else if (ch >= '2' && ch <= '7') val = ch - '2' + 26;
+        if (val < 0) break;
+        buffer = (buffer << 5) | val;
+        bitsLeft += 5;
+        if (bitsLeft >= 8) {
+            result[count++] = (buffer >> (bitsLeft - 8)) & 0xFF;
+            bitsLeft -= 8;
+        }
+    }
+    return count;
+}
 
 // --- LED Logic ---
 uint32_t Wheel(byte WheelPos) {
@@ -98,6 +129,21 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 void updateLEDs() {
+  if (current_state == MODE_TOTP && time_offset > 0 && totp_secret != "") {
+      unsigned long current_time = (millis() / 1000) + time_offset;
+      int seconds_left = 30 - (current_time % 30);
+      int leds_to_light = (seconds_left * NUM_LEDS) / 30;
+      
+      strip.clear();
+      uint32_t color = strip.Color(0, 255, 0); // Green
+      if (seconds_left <= 5) color = strip.Color(255, 0, 0); // Red
+      else if (seconds_left <= 10) color = strip.Color(255, 255, 0); // Yellow
+      
+      for(int i=0; i<leds_to_light; i++) strip.setPixelColor(i, color);
+      strip.show();
+      return; 
+  }
+
   if (current_pattern == "Solid") return;
   if (millis() - last_pattern_update > 20) { // Default fast loop
       
@@ -154,6 +200,7 @@ void updateLEDs() {
       }
   }
 }
+
 // --- Text Drawing ---
 void drawWordWrappedText(String text, int size, int r, int g, int b, String align) {
   tft.fillScreen(ST77XX_BLACK);
@@ -293,16 +340,52 @@ void render_tvbgone() {
 
 void render_totp() {
     tft.fillScreen(ST77XX_BLACK);
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_GREEN);
-    tft.setCursor(20, 30);
-    tft.println("TOTP TOKENS");
+    
+    if (time_offset == 0) {
+        tft.setTextSize(2);
+        tft.setTextColor(ST77XX_YELLOW);
+        tft.setCursor(20, 100);
+        tft.println("Time Not Synced!");
+        tft.setCursor(20, 140);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.println("Connect Python/Android");
+        tft.setCursor(20, 170);
+        tft.println("App to Sync Time.");
+    } 
+    else if (totp_secret == "") {
+        tft.setTextSize(2);
+        tft.setTextColor(ST77XX_RED);
+        tft.setCursor(20, 100);
+        tft.println("No TOTP Token Found!");
+        tft.setCursor(20, 140);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.println("Add one via the App.");
+    } 
+    else {
+        uint8_t hmacKey[40];
+        int keyLen = base32_decode(totp_secret.c_str(), hmacKey, sizeof(hmacKey));
+        
+        TOTP totp(hmacKey, keyLen);
+        unsigned long current_time = (millis() / 1000) + time_offset;
+        char* new_code = totp.getCode(current_time);
+        last_totp_code = String(new_code);
+        
+        tft.setTextSize(3);
+        tft.setTextColor(ST77XX_GREEN);
+        int name_x = (SCREEN_W - (totp_name.length() * 18)) / 2;
+        if(name_x < 0) name_x = 0;
+        tft.setCursor(name_x, 50);
+        tft.println(totp_name);
+        
+        tft.setTextSize(5);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setCursor((SCREEN_W - (6 * 30)) / 2, 120);
+        tft.println(last_totp_code);
+    }
+    
     tft.setTextSize(2);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(20, 100);
-    tft.println("Tokens coming soon!");
-    tft.setCursor(20, 200);
     tft.setTextColor(ST77XX_YELLOW);
+    tft.setCursor(20, 210);
     tft.println("B4: Exit");
 }
 
@@ -340,6 +423,9 @@ void load_state() {
     
     show_image_mode = prefs.getBool("img_mode", false);
     
+    totp_name = prefs.getString("totp_name", "");
+    totp_secret = prefs.getString("totp_sec", "");
+    
     // Find pattern index
     for(int i=0; i<PATTERN_COUNT; i++) {
         if(current_pattern == String(patterns[i])) {
@@ -368,13 +454,24 @@ void save_state() {
     prefs.putString("t_al", text_align);
     
     prefs.putBool("img_mode", show_image_mode);
+    
+    prefs.putString("totp_name", totp_name);
+    prefs.putString("totp_sec", totp_secret);
+    
     prefs.end();
 }
 
 void switch_state(AppState new_state) {
     current_state = new_state;
     save_state();
-    if(current_state == MODE_MENU) render_menu();
+    if(current_state == MODE_MENU) {
+        if(current_pattern == "Solid") {
+            strip.setBrightness(led_brightness);
+            for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
+            strip.show();
+        }
+        render_menu();
+    }
     else if(current_state == MODE_NAMETAG) render_nametag();
     else if(current_state == MODE_TVBGONE) render_tvbgone();
     else if(current_state == MODE_TOTP) render_totp();
@@ -382,8 +479,6 @@ void switch_state(AppState new_state) {
 }
 
 // --- API ---
-File imgFile;
-
 void processCommand(String data) {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data);
@@ -402,7 +497,6 @@ void processCommand(String data) {
         text_align = doc["args"]["align"].as<String>();
         
         save_state();
-        // Do NOT automatically switch to text mode if image is showing
         if(current_state == MODE_NAMETAG && !show_image_mode) {
             render_nametag();
         }
@@ -463,11 +557,25 @@ void processCommand(String data) {
             
             if(y == 239) {
                 if(imgFile) imgFile.close();
-                // Do NOT automatically switch to image mode! Wait for user B1 press.
             }
         } else {
             Serial.printf("{\"event\": \"row_err\", \"y\": %d}\n", y);
         }
+    }
+    else if (cmd == "sync_time") {
+        unsigned long t = doc["args"]["t"].as<unsigned long>();
+        time_offset = t - (millis() / 1000);
+        Serial.println("{\"status\": \"ok\", \"cmd\": \"sync_time\"}");
+        sendBLE("{\"status\": \"ok\", \"cmd\": \"sync_time\"}");
+        if (current_state == MODE_TOTP) render_totp();
+    }
+    else if (cmd == "add_totp") {
+        totp_name = doc["args"]["name"].as<String>();
+        totp_secret = doc["args"]["secret"].as<String>();
+        save_state();
+        Serial.println("{\"status\": \"ok\", \"cmd\": \"add_totp\"}");
+        sendBLE("{\"status\": \"ok\", \"cmd\": \"add_totp\"}");
+        if (current_state == MODE_TOTP) render_totp();
     }
 }
 
@@ -524,6 +632,18 @@ void loop() {
     }
 
     updateLEDs();
+
+    // Check if TOTP code changed to re-render screen
+    if (current_state == MODE_TOTP && time_offset > 0 && totp_secret != "") {
+        uint8_t hmacKey[40];
+        int keyLen = base32_decode(totp_secret.c_str(), hmacKey, sizeof(hmacKey));
+        TOTP totp(hmacKey, keyLen);
+        unsigned long current_time = (millis() / 1000) + time_offset;
+        char* new_code = totp.getCode(current_time);
+        if (String(new_code) != last_totp_code) {
+            render_totp();
+        }
+    }
 
     bool curr_b1 = false;
     bool curr_b2 = false;
