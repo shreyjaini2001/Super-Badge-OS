@@ -417,10 +417,14 @@ void render_totp() {
 
 void render_games() {
     tft.fillScreen(ST77XX_BLACK);
+    // Draw court borders
+    tft.drawRect(0, 0, 320, 240, ST77XX_CYAN);
+    tft.drawRect(1, 1, 318, 238, ST77XX_CYAN);
+    
     player_score = 0;
     ai_score = 0;
     ball_x = 160; ball_y = 120;
-    ball_dx = 2.0; ball_dy = 1.5;
+    ball_dx = 2.5; ball_dy = 1.8;
     paddle_y = 100; ai_y = 100;
 }
 
@@ -433,24 +437,24 @@ void play_pong() {
     tft.fillRect(10, paddle_y, 6, 40, ST77XX_BLACK);
     tft.fillRect(304, ai_y, 6, 40, ST77XX_BLACK);
 
-    // Update player (state_b1 and state_b2 are global holding the continuous button state)
+    // Update player
     if (state_b1) paddle_y -= 5;
     if (state_b2) paddle_y += 5;
-    if (paddle_y < 0) paddle_y = 0;
-    if (paddle_y > 200) paddle_y = 200;
+    if (paddle_y < 2) paddle_y = 2;
+    if (paddle_y > 196) paddle_y = 196;
 
-    // Update AI (with some delay to make it beatable)
+    // Update AI
     if (ai_y + 20 < ball_y - 10) ai_y += 3;
     if (ai_y + 20 > ball_y + 10) ai_y -= 3;
-    if (ai_y < 0) ai_y = 0;
-    if (ai_y > 200) ai_y = 200;
+    if (ai_y < 2) ai_y = 2;
+    if (ai_y > 196) ai_y = 196;
 
     // Update ball
     ball_x += ball_dx;
     ball_y += ball_dy;
 
     // Top/Bottom collision
-    if (ball_y <= 0 || ball_y >= 234) {
+    if (ball_y <= 2 || ball_y >= 232) {
         ball_dy = -ball_dy;
     }
 
@@ -458,42 +462,46 @@ void play_pong() {
     if (ball_x <= 16 && ball_x >= 10 && ball_y + 6 >= paddle_y && ball_y <= paddle_y + 40) {
         ball_dx = -ball_dx;
         ball_x = 17;
-        if (ball_dx < 6.0) ball_dx *= 1.1;
+        if (ball_dx < 7.0) ball_dx *= 1.15;
     }
 
     // AI collision
     if (ball_x >= 298 && ball_x <= 304 && ball_y + 6 >= ai_y && ball_y <= ai_y + 40) {
         ball_dx = -ball_dx;
         ball_x = 297;
-        if (ball_dx > -6.0) ball_dx *= 1.1;
+        if (ball_dx > -7.0) ball_dx *= 1.15;
     }
 
     // Scoring
     if (ball_x < 0) {
         ai_score++;
-        ball_x = 160; ball_y = 120; ball_dx = 2.0; ball_dy = 1.5;
-        tft.fillScreen(ST77XX_BLACK);
+        ball_x = 160; ball_y = 120; ball_dx = 2.5; ball_dy = 1.8;
+        render_games(); // redraw court
     } else if (ball_x > 320) {
         player_score++;
-        ball_x = 160; ball_y = 120; ball_dx = -2.0; ball_dy = 1.5;
-        tft.fillScreen(ST77XX_BLACK);
+        ball_x = 160; ball_y = 120; ball_dx = -2.5; ball_dy = 1.8;
+        render_games();
     }
 
-    // Draw Center Net
-    for(int y=0; y<240; y+=10) tft.drawFastVLine(160, y, 5, ST77XX_WHITE);
+    // Draw Center Net (Dashed, cyan)
+    for(int y=4; y<236; y+=16) {
+        tft.fillRect(158, y, 4, 8, ST77XX_CYAN);
+    }
     
     // Draw Scores
-    tft.setTextSize(2);
-    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    tft.setCursor(100, 10);
+    tft.setTextSize(3);
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    if(player_score < 10) tft.setCursor(110, 20);
+    else tft.setCursor(90, 20);
     tft.print(player_score);
-    tft.setCursor(210, 10);
+    
+    tft.setCursor(190, 20);
     tft.print(ai_score);
 
     // Draw new
     tft.fillRect((int)ball_x, (int)ball_y, 6, 6, ST77XX_WHITE);
-    tft.fillRect(10, paddle_y, 6, 40, ST77XX_WHITE);
-    tft.fillRect(304, ai_y, 6, 40, ST77XX_WHITE);
+    tft.fillRect(10, paddle_y, 6, 40, ST77XX_MAGENTA);
+    tft.fillRect(304, ai_y, 6, 40, ST77XX_RED);
 }
 
 
