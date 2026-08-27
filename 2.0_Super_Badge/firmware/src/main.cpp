@@ -83,8 +83,8 @@ const char* menu_items[] = {
 const int MENU_COUNT = 4;
 int menu_index = 0;
 
-const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle"};
-const int PATTERN_COUNT = 7;
+const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle", "Lights Off"};
+const int PATTERN_COUNT = 8;
 int pattern_index = 0;
 
 // Function Prototypes
@@ -147,7 +147,19 @@ void updateLEDs() {
       return; 
   }
 
-  if (current_pattern == "Solid") return;
+  if (current_pattern == "Solid") {
+      if (millis() - last_pattern_update > 200) {
+          last_pattern_update = millis();
+          for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
+          strip.show();
+      }
+      return;
+  }
+  if (current_pattern == "Lights Off") {
+      strip.clear();
+      strip.show();
+      return;
+  }
   if (millis() - last_pattern_update > 20) { // Default fast loop
       
       if (current_pattern == "Rainbow") {
@@ -674,7 +686,9 @@ void loop() {
         if (data.length() > 0) processCommand(data);
     }
 
-    updateLEDs();
+    if (!(current_state == MODE_GAMES && current_game_state == GAME_SIMON)) {
+        updateLEDs();
+    }
 
     // Check if TOTP code changed to re-render screen
     if (current_state == MODE_TOTP && time_offset > 0 && current_totp_slot != -1 && totp_secrets[current_totp_slot] != "") {

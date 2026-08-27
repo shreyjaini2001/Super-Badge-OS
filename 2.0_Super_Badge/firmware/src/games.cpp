@@ -7,7 +7,7 @@ const char* game_menu_items[] = {
     "Pong",
     "Snake",
     "Simon Says",
-    "Doom 3D"
+    "Flappy Badge"
 };
 const int GAME_MENU_COUNT = 4;
 int game_menu_index = 0;
@@ -304,131 +304,67 @@ void loop_simon() {
     }
 }
 
-// --- DOOM 3D (Raycaster) ---
-const uint8_t mapWidth = 8;
-const uint8_t mapHeight = 8;
-const uint8_t worldMap[8][8] = {
-  {1,1,1,1,1,1,1,1},
-  {1,0,0,0,0,0,0,1},
-  {1,0,2,0,3,0,0,1},
-  {1,0,0,0,0,0,0,1},
-  {1,0,2,0,0,4,0,1},
-  {1,0,0,0,0,0,0,1},
-  {1,0,0,3,0,0,0,1},
-  {1,1,1,1,1,1,1,1}
-};
+// --- FLAPPY BADGE ---
+float flappy_y = 120;
+float flappy_dy = 0;
+int pipe_x = 320;
+int pipe_y = 100; 
+int flappy_score = 0;
+unsigned long flappy_last = 0;
+bool flappy_dead = false;
+bool flappy_b3_prev = false;
 
-float posX = 4.5, posY = 4.5;
-float dirX = -1.0, dirY = 0.0;
-float planeX = 0.0, planeY = 0.66;
-unsigned long doom_last = 0;
-
-void setup_doom() {
-    posX = 4.5; posY = 4.5;
-    dirX = -1.0; dirY = 0.0;
-    planeX = 0.0; planeY = 0.66;
+void setup_flappy() {
     tft.fillScreen(ST77XX_BLACK);
+    flappy_y = 120; flappy_dy = 0;
+    pipe_x = 320; pipe_y = random(60, 180);
+    flappy_score = 0;
+    flappy_dead = false;
 }
 
-void loop_doom() {
-    if(millis() - doom_last < 40) return; // ~25 FPS max
-    doom_last = millis();
+void loop_flappy() {
+    if (flappy_dead) return;
+    if (millis() - flappy_last < 16) return;
+    flappy_last = millis();
 
-    // Controls
-    float moveSpeed = 0.15;
-    float rotSpeed = 0.1;
+    // Erase old
+    tft.fillRect(60, (int)flappy_y, 10, 10, ST77XX_BLACK);
+    tft.fillRect(pipe_x, 0, 30, pipe_y - 30, ST77XX_BLACK);
+    tft.fillRect(pipe_x, pipe_y + 30, 30, 240 - (pipe_y + 30), ST77XX_BLACK);
+
+    if (state_b3 && !flappy_b3_prev) flappy_dy = -4.0; // Jump
+    flappy_dy += 0.25; // Gravity
+    flappy_y += flappy_dy;
+
+    pipe_x -= 3;
+    if (pipe_x < -30) {
+        pipe_x = 320;
+        pipe_y = random(60, 180);
+        flappy_score++;
+    }
+
+    // Collisions
+    if (flappy_y < 0 || flappy_y > 230 || 
+        (60 + 10 > pipe_x && 60 < pipe_x + 30 && (flappy_y < pipe_y - 30 || flappy_y + 10 > pipe_y + 30))) {
+        flappy_dead = true;
+        tft.setTextSize(3); tft.setTextColor(ST77XX_RED); 
+        tft.setCursor(80, 100); tft.print("GAME OVER");
+        return;
+    }
+
+    // Draw new
+    tft.fillRect(60, (int)flappy_y, 10, 10, ST77XX_YELLOW);
+    tft.fillRect(pipe_x, 0, 30, pipe_y - 30, ST77XX_GREEN);
+    tft.fillRect(pipe_x, pipe_y + 30, 30, 240 - (pipe_y + 30), ST77XX_GREEN);
     
-    if (state_b3) { // Forward
-        if(worldMap[int(posX + dirX * moveSpeed)][int(posY)] == 0) posX += dirX * moveSpeed;
-        if(worldMap[int(posX)][int(posY + dirY * moveSpeed)] == 0) posY += dirY * moveSpeed;
-    }
-    if (state_b1) { // Turn Left
-        float oldDirX = dirX;
-        dirX = dirX * cos(rotSpeed) - dirY * sin(rotSpeed);
-        dirY = oldDirX * sin(rotSpeed) + dirY * cos(rotSpeed);
-        float oldPlaneX = planeX;
-        planeX = planeX * cos(rotSpeed) - planeY * sin(rotSpeed);
-        planeY = oldPlaneX * sin(rotSpeed) + planeY * cos(rotSpeed);
-    }
-    if (state_b2) { // Turn Right
-        float oldDirX = dirX;
-        dirX = dirX * cos(-rotSpeed) - dirY * sin(-rotSpeed);
-        dirY = oldDirX * sin(-rotSpeed) + dirY * cos(-rotSpeed);
-        float oldPlaneX = planeX;
-        planeX = planeX * cos(-rotSpeed) - planeY * sin(-rotSpeed);
-        planeY = oldPlaneX * sin(-rotSpeed) + planeY * cos(-rotSpeed);
-    }
+    // Erase artifact trail from previous frame
+    tft.fillRect(pipe_x + 30, 0, 4, 240, ST77XX_BLACK);
 
-    // Raycast
-    for(int x = 0; x < 320; x+=4) { // Render every 4 pixels to save CPU
-        float cameraX = 2 * x / 320.0 - 1;
-        float rayDirX = dirX + planeX * cameraX;
-        float rayDirY = dirY + planeY * cameraX;
-
-        int mapX = int(posX);
-        int mapY = int(posY);
-
-        float sideDistX, sideDistY;
-        float deltaDistX = (rayDirX == 0) ? 1e30 : abs(1 / rayDirX);
-        float deltaDistY = (rayDirY == 0) ? 1e30 : abs(1 / rayDirY);
-        float perpWallDist;
-
-        int stepX, stepY;
-        int hit = 0;
-        int side;
-
-        if(rayDirX < 0) { stepX = -1; sideDistX = (posX - mapX) * deltaDistX; }
-        else { stepX = 1; sideDistX = (mapX + 1.0 - posX) * deltaDistX; }
-        if(rayDirY < 0) { stepY = -1; sideDistY = (posY - mapY) * deltaDistY; }
-        else { stepY = 1; sideDistY = (mapY + 1.0 - posY) * deltaDistY; }
-
-        while (hit == 0) {
-            if(sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
-            else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
-            if(mapX>0 && mapX<8 && mapY>0 && mapY<8) {
-                if(worldMap[mapX][mapY] > 0) hit = 1;
-            } else hit = 1; // OOB
-        }
-
-        if(side == 0) perpWallDist = (sideDistX - deltaDistX);
-        else          perpWallDist = (sideDistY - deltaDistY);
-
-        int lineHeight = (int)(240 / perpWallDist);
-        int drawStart = -lineHeight / 2 + 240 / 2;
-        if(drawStart < 0) drawStart = 0;
-        int drawEnd = lineHeight / 2 + 240 / 2;
-        if(drawEnd >= 240) drawEnd = 239;
-
-        uint16_t color;
-        int t = worldMap[mapX][mapY];
-        if(t == 1) color = ST77XX_RED;
-        else if(t == 2) color = ST77XX_GREEN;
-        else if(t == 3) color = ST77XX_BLUE;
-        else if(t == 4) color = ST77XX_WHITE;
-        else color = ST77XX_YELLOW;
-        
-        if(side == 1) { // Shadow
-            color = tft.color565(
-                (color >> 11 & 0x1F) * 4,
-                (color >> 5 & 0x3F) * 2,
-                (color & 0x1F) * 4
-            );
-        }
-
-        tft.drawFastVLine(x, 0, drawStart, ST77XX_BLACK);
-        tft.drawFastVLine(x, drawStart, drawEnd - drawStart, color);
-        tft.drawFastVLine(x, drawEnd, 240 - drawEnd, ST77XX_BLACK);
-        // Fill the 4px strip
-        tft.drawFastVLine(x+1, 0, drawStart, ST77XX_BLACK);
-        tft.drawFastVLine(x+1, drawStart, drawEnd - drawStart, color);
-        tft.drawFastVLine(x+1, drawEnd, 240 - drawEnd, ST77XX_BLACK);
-        tft.drawFastVLine(x+2, 0, drawStart, ST77XX_BLACK);
-        tft.drawFastVLine(x+2, drawStart, drawEnd - drawStart, color);
-        tft.drawFastVLine(x+2, drawEnd, 240 - drawEnd, ST77XX_BLACK);
-        tft.drawFastVLine(x+3, 0, drawStart, ST77XX_BLACK);
-        tft.drawFastVLine(x+3, drawStart, drawEnd - drawStart, color);
-        tft.drawFastVLine(x+3, drawEnd, 240 - drawEnd, ST77XX_BLACK);
-    }
+    tft.setTextSize(2); tft.setCursor(10, 10);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    tft.print(flappy_score);
+    
+    flappy_b3_prev = state_b3;
 }
 
 // --- STATE MANAGEMENT ---
@@ -439,24 +375,24 @@ void switch_game_state(GameState state) {
     else if (state == GAME_PONG) setup_pong();
     else if (state == GAME_SNAKE) setup_snake();
     else if (state == GAME_SIMON) setup_simon();
-    else if (state == GAME_DOOM) setup_doom();
+    else if (state == GAME_DOOM) setup_flappy();
 }
 
 bool btn3_prev = false;
 bool btn1_prev = false;
 bool btn2_prev = false;
+bool btn4_prev = false;
 
 void loop_games() {
-    if (state_b4) {
+    if (state_b4 && !btn4_prev) {
         if (current_game_state == GAME_MENU) {
             set_mode_menu(); // Exit games entirely
-            return;
         } else {
             switch_game_state(GAME_MENU); // Exit current game
-            delay(300); // debounce
-            return;
         }
     }
+    btn4_prev = state_b4;
+
 
     if (current_game_state == GAME_MENU) {
         if (state_b1 && !btn1_prev) {
@@ -469,23 +405,23 @@ void loop_games() {
             if(game_menu_index >= GAME_MENU_COUNT) game_menu_index = 0;
             render_games_menu();
         }
-        if (state_b3 && !btn3_prev) {
+        if (state_b3 && !flappy_b3_prev) {
             if (game_menu_index == 0) switch_game_state(GAME_PONG);
             if (game_menu_index == 1) switch_game_state(GAME_SNAKE);
             if (game_menu_index == 2) switch_game_state(GAME_SIMON);
             if (game_menu_index == 3) switch_game_state(GAME_DOOM);
         }
-        btn1_prev = state_b1; btn2_prev = state_b2; btn3_prev = state_b3;
+        btn1_prev = state_b1; btn2_prev = state_b2; flappy_b3_prev = state_b3;
     } 
     else if (current_game_state == GAME_PONG) loop_pong();
     else if (current_game_state == GAME_SNAKE) loop_snake();
     else if (current_game_state == GAME_SIMON) loop_simon();
-    else if (current_game_state == GAME_DOOM) loop_doom();
+    else if (current_game_state == GAME_DOOM) loop_flappy();
 }
 
 void launch_game_by_name(String name) {
     if(name == "pong") switch_game_state(GAME_PONG);
     else if(name == "snake") switch_game_state(GAME_SNAKE);
     else if(name == "simon") switch_game_state(GAME_SIMON);
-    else if(name == "doom") switch_game_state(GAME_DOOM);
+    else if(name == "flappy") switch_game_state(GAME_DOOM);
 }
