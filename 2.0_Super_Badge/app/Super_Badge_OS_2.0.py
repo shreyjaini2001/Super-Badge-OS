@@ -375,6 +375,9 @@ class SuperBadgeApp(ctk.CTk):
         
         ctk.CTkButton(btn_frame, text="Set PIN", fg_color="green", hover_color="darkgreen", command=self.set_pin).pack(side="left", padx=10)
         ctk.CTkButton(btn_frame, text="Remove PIN", fg_color="red", hover_color="darkred", command=self.clear_pin).pack(side="left", padx=10)
+        
+        ctk.CTkButton(f, text="Lock Badge Now", fg_color="orange", hover_color="darkorange", font=ctk.CTkFont(weight="bold"), 
+                      command=lambda: self.send_badge_cmd("lock")).pack(pady=20)
 
     def set_pin(self):
         pin = self.pin_entry.get()

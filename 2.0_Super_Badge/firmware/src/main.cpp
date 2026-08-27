@@ -82,9 +82,10 @@ const char* menu_items[] = {
     "Nametag",
     "TV-B-Gone",
     "TOTP Tokens",
-    "Games"
+    "Games",
+    "Lock Badge"
 };
-const int MENU_COUNT = 4;
+const int MENU_COUNT = 5;
 int menu_index = 0;
 
 const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle", "Lights Off"};
@@ -670,6 +671,16 @@ void processCommand(String data) {
         Serial.println(json);
         sendBLE(json);
     }
+    else if (cmd == "lock") {
+        if (badge_pin != "") {
+            entered_pin = "";
+            switch_state(MODE_LOCK);
+        } else {
+            switch_state(MODE_WELCOME);
+        }
+        Serial.println("{\"status\": \"ok\"}");
+        sendBLE("{\"status\": \"ok\"}");
+    }
     else if (cmd == "welcome") {
         switch_state(MODE_WELCOME);
         Serial.println("{\"status\": \"ok\"}");
@@ -870,6 +881,14 @@ void loop() {
                 switch_state(MODE_TOTP);
             }
             else if (menu_index == 3) switch_state(MODE_GAMES);
+            else if (menu_index == 4) {
+                if (badge_pin != "") {
+                    entered_pin = "";
+                    switch_state(MODE_LOCK);
+                } else {
+                    switch_state(MODE_WELCOME);
+                }
+            }
         } else if (current_state == MODE_TOTP) {
             if (current_totp_slot == 4) current_totp_slot = 5;
             else current_totp_slot = 4;
