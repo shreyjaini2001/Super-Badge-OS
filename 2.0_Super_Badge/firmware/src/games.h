@@ -26,7 +26,7 @@ enum GameState {
 
 extern GameState current_game_state;
 void switch_game_state(GameState state);
-void render_games_menu();
+void render_games_menu(bool full_redraw = true);
 void loop_games();
 void launch_game_by_name(String name);
 

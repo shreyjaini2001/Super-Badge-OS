@@ -12,12 +12,16 @@ const char* game_menu_items[] = {
 const int GAME_MENU_COUNT = 4;
 int game_menu_index = 0;
 
-void render_games_menu() {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_MAGENTA);
-    tft.setCursor((320 - (11 * 18)) / 2, 20);
-    tft.println("ARCADE MENU");
+void render_games_menu(bool full_redraw) {
+    if (full_redraw) {
+        tft.fillScreen(ST77XX_BLACK);
+        tft.setTextSize(3);
+        tft.setTextColor(ST77XX_MAGENTA);
+        tft.setCursor((320 - (11 * 18)) / 2, 20);
+        tft.println("ARCADE MENU");
+    } else {
+        tft.fillRect(0, 60, 320, 180, ST77XX_BLACK);
+    }
 
     tft.setTextSize(2);
     for (int i = 0; i < GAME_MENU_COUNT; i++) {
@@ -380,7 +384,7 @@ void switch_game_state(GameState state) {
     current_game_state = state;
     if (state == GAME_MENU) {
         btn1_prev = true; btn2_prev = true; btn3_prev = true; btn4_prev = true;
-        render_games_menu();
+        render_games_menu(true);
     }
     else if (state == GAME_PONG) setup_pong();
     else if (state == GAME_SNAKE) setup_snake();
@@ -405,12 +409,12 @@ void loop_games() {
         if (state_b1 && !btn1_prev) {
             game_menu_index--;
             if(game_menu_index < 0) game_menu_index = GAME_MENU_COUNT - 1;
-            render_games_menu();
+            render_games_menu(false);
         }
         if (state_b2 && !btn2_prev) {
             game_menu_index++;
             if(game_menu_index >= GAME_MENU_COUNT) game_menu_index = 0;
-            render_games_menu();
+            render_games_menu(false);
         }
         if (state_b3 && !flappy_b3_prev) {
             if (game_menu_index == 0) switch_game_state(GAME_PONG);

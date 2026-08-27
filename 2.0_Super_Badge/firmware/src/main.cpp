@@ -92,7 +92,7 @@ const int PATTERN_COUNT = 8;
 int pattern_index = 0;
 
 // Function Prototypes
-void render_menu();
+void render_menu(bool full_redraw = true);
 void render_nametag();
 void render_tvbgone();
 void render_totp();
@@ -283,19 +283,22 @@ void set_mode_menu() {
     switch_state(MODE_MENU);
 }
 
-void render_lock_screen() {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.drawRect(5, 5, 310, 230, ST77XX_CYAN);
-    tft.drawRect(8, 8, 304, 224, ST77XX_MAGENTA);
-    tft.setTextSize(4); tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(76, 60); tft.print("WELCOME");
-    tft.setTextSize(2); tft.setTextColor(ST77XX_CYAN);
-    tft.setCursor(76, 120); tft.print("Super Badge OS");
-    tft.setTextSize(1); tft.setTextColor(ST77XX_MAGENTA);
-    tft.setCursor(106, 150); tft.print("(C) Shreyjain 2026");
-
-    tft.setTextSize(1); tft.setTextColor(ST77XX_YELLOW);
-    tft.setCursor(105, 180); tft.print("What's the code???");
+void render_lock_screen(bool full_redraw) {
+    if (full_redraw) {
+        tft.fillScreen(ST77XX_BLACK);
+        tft.drawRect(5, 5, 310, 230, ST77XX_CYAN);
+        tft.drawRect(8, 8, 304, 224, ST77XX_MAGENTA);
+        tft.setTextSize(4); tft.setTextColor(ST77XX_WHITE);
+        tft.setCursor(76, 60); tft.print("WELCOME");
+        tft.setTextSize(2); tft.setTextColor(ST77XX_CYAN);
+        tft.setCursor(76, 120); tft.print("Super Badge OS");
+        tft.setTextSize(1); tft.setTextColor(ST77XX_MAGENTA);
+        tft.setCursor(106, 150); tft.print("(C) Shreyjain 2026");
+        tft.setTextSize(1); tft.setTextColor(ST77XX_YELLOW);
+        tft.setCursor(105, 180); tft.print("What's the code???");
+    } else {
+        tft.fillRect(20, 200, 280, 20, ST77XX_BLACK); // only clear the pin area
+    }
     
     tft.setTextSize(2); tft.setTextColor(ST77XX_WHITE);
     tft.setCursor(160 - (entered_pin.length() * 6), 200);
@@ -313,13 +316,18 @@ void render_welcome_screen() {
     tft.setTextSize(1); tft.setTextColor(ST77XX_MAGENTA);
     tft.setCursor(106, 150); tft.print("(C) Shreyjain 2026");
 }
-void render_menu() {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_CYAN);
-    tft.setCursor(20, 20);
-    tft.println("MAIN MENU");
-    tft.drawLine(20, 50, 300, 50, ST77XX_CYAN);
+void render_menu(bool full_redraw) {
+    if (full_redraw) {
+        tft.fillScreen(ST77XX_BLACK);
+        tft.setTextSize(3);
+        tft.setTextColor(ST77XX_CYAN);
+        tft.setCursor(20, 20);
+        tft.println("MAIN MENU");
+        tft.drawLine(20, 50, 300, 50, ST77XX_CYAN);
+    } else {
+        // clear just the menu items
+        tft.fillRect(0, 60, 320, 180, ST77XX_BLACK);
+    }
     
     tft.setTextSize(2);
     for(int i = 0; i < MENU_COUNT; i++) {
@@ -529,13 +537,13 @@ void switch_state(AppState new_state) {
             for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
             strip.show();
         }
-        render_menu();
+        render_menu(false);
     }
     else if(current_state == MODE_NAMETAG) render_nametag();
     else if(current_state == MODE_TVBGONE) render_tvbgone();
     else if(current_state == MODE_TOTP) render_totp();
     else if(current_state == MODE_GAMES) switch_game_state(GAME_MENU);
-    else if(current_state == MODE_LOCK) render_lock_screen();
+    else if(current_state == MODE_LOCK) render_lock_screen(true);
     else if(current_state == MODE_WELCOME) render_welcome_screen();
 }
 
@@ -783,7 +791,7 @@ void loop() {
             if (curr_b2 && !state_b2) entered_pin += "2";
             if (curr_b3 && !state_b3) entered_pin += "3";
             if (curr_b4 && !state_b4) entered_pin += "4";
-            render_lock_screen();
+            render_lock_screen(false);
             
             if (entered_pin.length() >= badge_pin.length()) {
                 if (entered_pin == badge_pin) {
@@ -794,7 +802,7 @@ void loop() {
                     tft.setTextSize(2); tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
                     tft.setCursor(110, 200); tft.print("INCORRECT");
                     delay(1000);
-                    render_lock_screen();
+                    render_lock_screen(false);
                 }
             }
         }
@@ -807,7 +815,7 @@ void loop() {
         if (current_state == MODE_MENU) {
             menu_index--;
             if(menu_index < 0) menu_index = MENU_COUNT - 1;
-            render_menu();
+            render_menu(false);
         } else if (current_state == MODE_TOTP) {
             if (current_totp_slot == 0) current_totp_slot = 1;
             else current_totp_slot = 0;
@@ -832,7 +840,7 @@ void loop() {
         if (current_state == MODE_MENU) {
             menu_index++;
             if(menu_index >= MENU_COUNT) menu_index = 0;
-            render_menu();
+            render_menu(false);
         } else if (current_state == MODE_TOTP) {
             if (current_totp_slot == 2) current_totp_slot = 3;
             else current_totp_slot = 2;
