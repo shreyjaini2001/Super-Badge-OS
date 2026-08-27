@@ -56,7 +56,7 @@ class SuperBadgeApp(ctk.CTk):
         self.btn_tv = ctk.CTkButton(self.sidebar_frame, text="TV Blaster", command=lambda: self.select_tab("tv"))
         self.btn_tv.grid(row=2, column=0, padx=20, pady=10)
         
-        self.btn_lasertag = ctk.CTkButton(self.sidebar_frame, text="TOTP Tokens", command=lambda: self.select_tab("lasertag"))
+        self.btn_lasertag = ctk.CTkButton(self.sidebar_frame, text="TOTP Tokens", command=lambda: self.select_tab("totp"))
         self.btn_lasertag.grid(row=3, column=0, padx=20, pady=10)
 
         self.btn_games = ctk.CTkButton(self.sidebar_frame, text="Games", command=lambda: self.select_tab("games"))
