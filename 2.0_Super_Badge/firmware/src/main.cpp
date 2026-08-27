@@ -537,7 +537,7 @@ void switch_state(AppState new_state) {
             for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(led_r, led_g, led_b));
             strip.show();
         }
-        render_menu(false);
+        render_menu(true);
     }
     else if(current_state == MODE_NAMETAG) render_nametag();
     else if(current_state == MODE_TVBGONE) render_tvbgone();
