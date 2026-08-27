@@ -87,7 +87,7 @@ class SuperBadgeApp(ctk.CTk):
         self.tabs["tv"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_tv_tab()
         
-        self.tabs["lasertag"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tabs["totp"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_totp_tab()
         
         self.tabs["games"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
