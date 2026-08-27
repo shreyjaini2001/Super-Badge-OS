@@ -61,6 +61,17 @@ unsigned long time_offset = 0;
 String last_totp_code = "";
 File imgFile;
 
+// Pong State
+int paddle_y = 100;
+int ai_y = 100;
+float ball_x = 160;
+float ball_y = 120;
+float ball_dx = 2.0;
+float ball_dy = 1.5;
+int player_score = 0;
+int ai_score = 0;
+unsigned long last_frame_time = 0;
+
 // App States
 enum AppState {
     MODE_MENU,
@@ -406,18 +417,85 @@ void render_totp() {
 
 void render_games() {
     tft.fillScreen(ST77XX_BLACK);
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_MAGENTA);
-    tft.setCursor(20, 30);
-    tft.println("GAMES");
-    tft.setTextSize(2);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(20, 100);
-    tft.println("Games coming soon!");
-    tft.setCursor(20, 200);
-    tft.setTextColor(ST77XX_YELLOW);
-    tft.println("B4: Exit");
+    player_score = 0;
+    ai_score = 0;
+    ball_x = 160; ball_y = 120;
+    ball_dx = 2.0; ball_dy = 1.5;
+    paddle_y = 100; ai_y = 100;
 }
+
+void play_pong() {
+    if (millis() - last_frame_time < 16) return; // ~60 FPS
+    last_frame_time = millis();
+
+    // Erase old
+    tft.fillRect((int)ball_x, (int)ball_y, 6, 6, ST77XX_BLACK);
+    tft.fillRect(10, paddle_y, 6, 40, ST77XX_BLACK);
+    tft.fillRect(304, ai_y, 6, 40, ST77XX_BLACK);
+
+    // Update player (state_b1 and state_b2 are global holding the continuous button state)
+    if (state_b1) paddle_y -= 5;
+    if (state_b2) paddle_y += 5;
+    if (paddle_y < 0) paddle_y = 0;
+    if (paddle_y > 200) paddle_y = 200;
+
+    // Update AI (with some delay to make it beatable)
+    if (ai_y + 20 < ball_y - 10) ai_y += 3;
+    if (ai_y + 20 > ball_y + 10) ai_y -= 3;
+    if (ai_y < 0) ai_y = 0;
+    if (ai_y > 200) ai_y = 200;
+
+    // Update ball
+    ball_x += ball_dx;
+    ball_y += ball_dy;
+
+    // Top/Bottom collision
+    if (ball_y <= 0 || ball_y >= 234) {
+        ball_dy = -ball_dy;
+    }
+
+    // Player collision
+    if (ball_x <= 16 && ball_x >= 10 && ball_y + 6 >= paddle_y && ball_y <= paddle_y + 40) {
+        ball_dx = -ball_dx;
+        ball_x = 17;
+        if (ball_dx < 6.0) ball_dx *= 1.1;
+    }
+
+    // AI collision
+    if (ball_x >= 298 && ball_x <= 304 && ball_y + 6 >= ai_y && ball_y <= ai_y + 40) {
+        ball_dx = -ball_dx;
+        ball_x = 297;
+        if (ball_dx > -6.0) ball_dx *= 1.1;
+    }
+
+    // Scoring
+    if (ball_x < 0) {
+        ai_score++;
+        ball_x = 160; ball_y = 120; ball_dx = 2.0; ball_dy = 1.5;
+        tft.fillScreen(ST77XX_BLACK);
+    } else if (ball_x > 320) {
+        player_score++;
+        ball_x = 160; ball_y = 120; ball_dx = -2.0; ball_dy = 1.5;
+        tft.fillScreen(ST77XX_BLACK);
+    }
+
+    // Draw Center Net
+    for(int y=0; y<240; y+=10) tft.drawFastVLine(160, y, 5, ST77XX_WHITE);
+    
+    // Draw Scores
+    tft.setTextSize(2);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    tft.setCursor(100, 10);
+    tft.print(player_score);
+    tft.setCursor(210, 10);
+    tft.print(ai_score);
+
+    // Draw new
+    tft.fillRect((int)ball_x, (int)ball_y, 6, 6, ST77XX_WHITE);
+    tft.fillRect(10, paddle_y, 6, 40, ST77XX_WHITE);
+    tft.fillRect(304, ai_y, 6, 40, ST77XX_WHITE);
+}
+
 
 // --- Persistence ---
 void load_state() {
@@ -620,6 +698,14 @@ void processCommand(String data) {
         Serial.println(json);
         sendBLE(json);
     }
+    else if (cmd == "game_launch") {
+        String game = doc["args"]["game"].as<String>();
+        if (game == "pong") {
+            switch_state(MODE_GAMES);
+        }
+        Serial.println("{\"status\": \"ok\"}");
+        sendBLE("{\"status\": \"ok\"}");
+    }
 }
 
 void setup() {
@@ -787,6 +873,10 @@ void loop() {
     state_b2 = curr_b2;
     state_b3 = curr_b3;
     state_b4 = curr_b4;
+    
+    if (current_state == MODE_GAMES) {
+        play_pong();
+    }
 
     delay(10);
 }
