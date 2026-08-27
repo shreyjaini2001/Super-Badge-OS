@@ -95,9 +95,11 @@ class SuperBadgeApp(ctk.CTk):
         
         self.tabs["games"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_games_tab()
+        
+        self.tabs["security"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_security_tab()
 
-        self.send_badge_cmd("welcome")
+        self.select_tab("display")
         self.text_color = (255, 255, 255)
 
     def select_tab(self, name):
