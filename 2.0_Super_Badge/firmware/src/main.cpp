@@ -62,6 +62,10 @@ unsigned long time_offset = 0;
 String last_totp_code = "";
 File imgFile;
 
+// --- Idle Timeout ---
+unsigned long last_activity_time = 0;
+const unsigned long IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
 // App States
 enum AppState {
     MODE_MENU,
