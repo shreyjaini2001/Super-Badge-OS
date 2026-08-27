@@ -16,3 +16,11 @@ A complete reverse engineering, custom firmware, and desktop control application
 - ✅ **Non-Volatile Storage:** Badge remembers its last screen state, text, and LED pattern after reboot using `LittleFS` and `Preferences`.
 
 *Work in Progress: Restoring physical button inputs, TV-B-Gone IR blaster, and Laser Tag.*
+
+## Super Badge OS 2.0
+The `2.0_Super_Badge` folder contains a complete rewrite of the badge operating system with a standalone state machine!
+*   **Menu System**: Fully interactive main menu using B1 (Up), B2 (Down), B3 (Select), B4 (Exit).
+*   **Nametag Mode**: Displays text and images. Remembers state across reboots using NVS Persistence.
+*   **LED Engine**: Features 7 different patterns including Mixed Cylon, Mixed Twinkle, and Rainbow Sparkle.
+*   **Bluetooth Low Energy (BLE)**: Supports updating the badge completely wirelessly using the Android "Serial Bluetooth Terminal" app!
+*   **Fast Image Uploading**: Streams raw RGB565 files directly into SPIFFS storage.
