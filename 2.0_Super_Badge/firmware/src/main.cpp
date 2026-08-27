@@ -285,20 +285,21 @@ void set_mode_menu() {
 
 void render_lock_screen() {
     tft.fillScreen(ST77XX_BLACK);
-    tft.drawRect(145, 60, 30, 30, ST77XX_WHITE);
-    tft.drawCircle(160, 60, 15, ST77XX_WHITE);
-    tft.fillRect(145, 60, 30, 15, ST77XX_BLACK);
-    tft.fillRect(156, 70, 8, 12, ST77XX_WHITE);
-
+    tft.drawRect(5, 5, 310, 230, ST77XX_CYAN);
+    tft.drawRect(8, 8, 304, 224, ST77XX_MAGENTA);
+    tft.setTextSize(4); tft.setTextColor(ST77XX_WHITE);
+    tft.setCursor(76, 60); tft.print("WELCOME");
     tft.setTextSize(2); tft.setTextColor(ST77XX_CYAN);
-    tft.setCursor(80, 110); tft.print("ENTER PASSWORD");
-    
-    tft.setTextSize(3); tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(160 - (entered_pin.length() * 9), 160);
-    for(int i=0; i<entered_pin.length(); i++) tft.print("*");
-    
+    tft.setCursor(76, 120); tft.print("Super Badge OS");
+    tft.setTextSize(1); tft.setTextColor(ST77XX_MAGENTA);
+    tft.setCursor(106, 150); tft.print("(C) Shreyjain 2026");
+
     tft.setTextSize(1); tft.setTextColor(ST77XX_YELLOW);
-    tft.setCursor(60, 210); tft.print("B1:1   B2:2   B3:3   B4:4");
+    tft.setCursor(105, 180); tft.print("What's the code???");
+    
+    tft.setTextSize(2); tft.setTextColor(ST77XX_WHITE);
+    tft.setCursor(160 - (entered_pin.length() * 6), 200);
+    for(int i=0; i<entered_pin.length(); i++) tft.print("*");
 }
 
 void render_welcome_screen() {
@@ -791,7 +792,7 @@ void loop() {
                 } else {
                     entered_pin = "";
                     tft.setTextSize(2); tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
-                    tft.setCursor(110, 190); tft.print("INCORRECT");
+                    tft.setCursor(110, 200); tft.print("INCORRECT");
                     delay(1000);
                     render_lock_screen();
                 }

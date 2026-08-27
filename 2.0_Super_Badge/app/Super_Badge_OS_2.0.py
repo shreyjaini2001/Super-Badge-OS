@@ -50,7 +50,7 @@ class SuperBadgeApp(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Super Badge", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.btn_display = ctk.CTkButton(self.sidebar_frame, text="Display & LEDs", command=lambda: self.select_tab("display"))
+        self.btn_display = ctk.CTkButton(self.sidebar_frame, text="Display & LEDs", command=lambda: self.send_badge_cmd("welcome"))
         self.btn_display.grid(row=1, column=0, padx=20, pady=10)
 
         self.btn_tv = ctk.CTkButton(self.sidebar_frame, text="TV Blaster", command=lambda: self.select_tab("tv"))
@@ -95,8 +95,9 @@ class SuperBadgeApp(ctk.CTk):
         
         self.tabs["games"] = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.setup_games_tab()
+        self.setup_security_tab()
 
-        self.select_tab("display")
+        self.send_badge_cmd("welcome")
         self.text_color = (255, 255, 255)
 
     def select_tab(self, name):
@@ -253,39 +254,6 @@ class SuperBadgeApp(ctk.CTk):
 
 
 
-    def setup_security_tab(self):
-        f = self.tabs["security"]
-        ctk.CTkLabel(f, text="Badge Lock Screen", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(30, 10))
-        ctk.CTkLabel(f, text="Secure your badge and 2FA codes with a button-combination PIN.").pack(pady=(0, 20))
-        
-        form = ctk.CTkFrame(f)
-        form.pack(pady=10, padx=40, fill="x")
-        
-        ctk.CTkLabel(form, text="New Security PIN:", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
-        ctk.CTkLabel(form, text="Must only contain digits 1, 2, 3, or 4 (corresponding to badge buttons). Max 8 digits.").pack()
-        
-        self.pin_entry = ctk.CTkEntry(form, placeholder_text="e.g. 1423", width=200, justify="center")
-        self.pin_entry.pack(pady=15)
-        
-        btn_frame = ctk.CTkFrame(form, fg_color="transparent")
-        btn_frame.pack(pady=(0, 20))
-        
-        ctk.CTkButton(btn_frame, text="Set PIN", fg_color="green", hover_color="darkgreen", command=self.set_pin).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Remove PIN", fg_color="red", hover_color="darkred", command=self.clear_pin).pack(side="left", padx=10)
-
-    def set_pin(self):
-        pin = self.pin_entry.get()
-        if not all(c in "1234" for c in pin):
-            print("PIN must only contain digits 1, 2, 3, or 4!")
-            return
-        self.send_badge_cmd("set_pin", {"pin": pin})
-        print(f"Set PIN to {pin}")
-
-    def clear_pin(self):
-        self.send_badge_cmd("set_pin", {"pin": ""})
-        self.pin_entry.delete(0, 'end')
-        print("Removed PIN")
-
     def setup_tv_tab(self):
         f = self.tabs["tv"]
         ctk.CTkLabel(f, text="TV-B-Gone Infrared Blaster", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(50, 20))
@@ -383,6 +351,7 @@ class SuperBadgeApp(ctk.CTk):
         import time
         current_unix = int(time.time())
         self.send_badge_cmd("sync_time", {"t": current_unix})
+
 
 
     def setup_security_tab(self):
