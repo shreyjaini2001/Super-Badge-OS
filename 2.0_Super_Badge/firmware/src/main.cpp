@@ -10,6 +10,7 @@
 #include "tvbgone.h"
 #include "ble_manager.h"
 #include <TOTP.h>
+#include "games.h"
 
 // --- Constants & Pins ---
 #define LED_PIN     8
@@ -61,17 +62,6 @@ unsigned long time_offset = 0;
 String last_totp_code = "";
 File imgFile;
 
-// Pong State
-int paddle_y = 100;
-int ai_y = 100;
-float ball_x = 160;
-float ball_y = 120;
-float ball_dx = 2.0;
-float ball_dy = 1.5;
-int player_score = 0;
-int ai_score = 0;
-unsigned long last_frame_time = 0;
-
 // App States
 enum AppState {
     MODE_MENU,
@@ -81,6 +71,7 @@ enum AppState {
     MODE_GAMES
 };
 AppState current_state = MODE_MENU;
+void switch_state(AppState new_state);
 
 // Menu
 const char* menu_items[] = {
@@ -271,6 +262,10 @@ void drawWordWrappedText(String text, int size, int r, int g, int b, String alig
 }
 
 // --- Menu UI ---
+
+void set_mode_menu() {
+    switch_state(MODE_MENU);
+}
 void render_menu() {
     tft.fillScreen(ST77XX_BLACK);
     tft.setTextSize(3);
@@ -415,96 +410,6 @@ void render_totp() {
     tft.println("B4: Exit");
 }
 
-void render_games() {
-    tft.fillScreen(ST77XX_BLACK);
-    // Draw court borders
-    tft.drawRect(0, 0, 320, 240, ST77XX_CYAN);
-    tft.drawRect(1, 1, 318, 238, ST77XX_CYAN);
-    
-    player_score = 0;
-    ai_score = 0;
-    ball_x = 160; ball_y = 120;
-    ball_dx = 2.5; ball_dy = 1.8;
-    paddle_y = 100; ai_y = 100;
-}
-
-void play_pong() {
-    if (millis() - last_frame_time < 16) return; // ~60 FPS
-    last_frame_time = millis();
-
-    // Erase old
-    tft.fillRect((int)ball_x, (int)ball_y, 6, 6, ST77XX_BLACK);
-    tft.fillRect(10, paddle_y, 6, 40, ST77XX_BLACK);
-    tft.fillRect(304, ai_y, 6, 40, ST77XX_BLACK);
-
-    // Update player
-    if (state_b1) paddle_y -= 5;
-    if (state_b2) paddle_y += 5;
-    if (paddle_y < 2) paddle_y = 2;
-    if (paddle_y > 196) paddle_y = 196;
-
-    // Update AI
-    if (ai_y + 20 < ball_y - 10) ai_y += 3;
-    if (ai_y + 20 > ball_y + 10) ai_y -= 3;
-    if (ai_y < 2) ai_y = 2;
-    if (ai_y > 196) ai_y = 196;
-
-    // Update ball
-    ball_x += ball_dx;
-    ball_y += ball_dy;
-
-    // Top/Bottom collision
-    if (ball_y <= 2 || ball_y >= 232) {
-        ball_dy = -ball_dy;
-    }
-
-    // Player collision
-    if (ball_x <= 16 && ball_x >= 10 && ball_y + 6 >= paddle_y && ball_y <= paddle_y + 40) {
-        ball_dx = -ball_dx;
-        ball_x = 17;
-        if (ball_dx < 7.0) ball_dx *= 1.15;
-    }
-
-    // AI collision
-    if (ball_x >= 298 && ball_x <= 304 && ball_y + 6 >= ai_y && ball_y <= ai_y + 40) {
-        ball_dx = -ball_dx;
-        ball_x = 297;
-        if (ball_dx > -7.0) ball_dx *= 1.15;
-    }
-
-    // Scoring
-    if (ball_x < 0) {
-        ai_score++;
-        ball_x = 160; ball_y = 120; ball_dx = 2.5; ball_dy = 1.8;
-        render_games(); // redraw court
-    } else if (ball_x > 320) {
-        player_score++;
-        ball_x = 160; ball_y = 120; ball_dx = -2.5; ball_dy = 1.8;
-        render_games();
-    }
-
-    // Draw Center Net (Dashed, cyan)
-    for(int y=4; y<236; y+=16) {
-        tft.fillRect(158, y, 4, 8, ST77XX_CYAN);
-    }
-    
-    // Draw Scores
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    if(player_score < 10) tft.setCursor(110, 20);
-    else tft.setCursor(90, 20);
-    tft.print(player_score);
-    
-    tft.setCursor(190, 20);
-    tft.print(ai_score);
-
-    // Draw new
-    tft.fillRect((int)ball_x, (int)ball_y, 6, 6, ST77XX_WHITE);
-    tft.fillRect(10, paddle_y, 6, 40, ST77XX_MAGENTA);
-    tft.fillRect(304, ai_y, 6, 40, ST77XX_RED);
-}
-
-
 // --- Persistence ---
 void load_state() {
     prefs.begin("badge", false);
@@ -580,7 +485,7 @@ void switch_state(AppState new_state) {
     else if(current_state == MODE_NAMETAG) render_nametag();
     else if(current_state == MODE_TVBGONE) render_tvbgone();
     else if(current_state == MODE_TOTP) render_totp();
-    else if(current_state == MODE_GAMES) render_games();
+    else if(current_state == MODE_GAMES) switch_game_state(GAME_MENU);
 }
 
 // --- API ---
@@ -708,9 +613,10 @@ void processCommand(String data) {
     }
     else if (cmd == "game_launch") {
         String game = doc["args"]["game"].as<String>();
-        if (game == "pong") {
+        if (current_state != MODE_GAMES) {
             switch_state(MODE_GAMES);
         }
+        launch_game_by_name(game);
         Serial.println("{\"status\": \"ok\"}");
         sendBLE("{\"status\": \"ok\"}");
     }
@@ -883,7 +789,7 @@ void loop() {
     state_b4 = curr_b4;
     
     if (current_state == MODE_GAMES) {
-        play_pong();
+        loop_games();
     }
 
     delay(10);
