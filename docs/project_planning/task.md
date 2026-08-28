@@ -1,0 +1,7 @@
+- [x] Add `NimBLE-Arduino` to `platformio.ini`
+- [x] Create `ble_manager.h` to handle NimBLE UART and pass commands to JSON parser
+- [x] Implement `SPIFFS` file saving/loading for images and text in `main.cpp`
+- [x] Implement `Preferences` NVS saving/loading for current mode and LED state
+- [x] Refactor `main.cpp` loop into a State Machine (Menu, Nametag, TV-B-Gone, etc.)
+- [x] Implement Menu drawing and navigation logic
+- [x] Flash and verify persistence and Bluetooth functionality
