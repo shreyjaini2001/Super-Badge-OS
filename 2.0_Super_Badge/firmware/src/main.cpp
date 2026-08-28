@@ -84,7 +84,7 @@ String entered_pin = "";
 // Menu
 const char* menu_items[] = {
     "Nametag",
-    "TV-B-Gone",
+    "Attack Radar",
     "TOTP Tokens",
     "Games",
     "Lock Badge"
@@ -822,7 +822,7 @@ void loop() {
             show_image_mode = true;
             save_state();
             render_nametag();
-
+        }
     }
     if (curr_b2 && !state_b2) {
         if (current_state == MODE_MENU) {
@@ -888,6 +888,5 @@ void loop() {
     if (current_state == MODE_GAMES) {
         loop_games();
     }
-}
     delay(10);
 }
