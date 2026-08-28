@@ -7,7 +7,7 @@
 #include <Wire.h>
 #include <Preferences.h>
 #include <SPIFFS.h>
-#include "tvbgone.h"
+#include "wifi_radar.h"
 #include "ble_manager.h"
 #include <TOTP.h>
 #include "games.h"
@@ -70,7 +70,7 @@ const unsigned long IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 enum AppState {
     MODE_MENU,
     MODE_NAMETAG,
-    MODE_TVBGONE,
+    MODE_DEAUTH,
     MODE_TOTP,
     MODE_GAMES,
     MODE_LOCK,
@@ -99,7 +99,7 @@ int pattern_index = 0;
 // Function Prototypes
 void render_menu(bool full_redraw = true);
 void render_nametag();
-void render_tvbgone();
+void render_wifi_radar(bool full_redraw);
 void render_totp();
 void render_games();
 void load_state();
@@ -386,24 +386,7 @@ void render_nametag() {
     }
 }
 
-void render_tvbgone() {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setTextSize(3);
-    tft.setTextColor(ST77XX_RED);
-    tft.setCursor(20, 30);
-    tft.println("TV-B-GONE");
-    
-    tft.setTextSize(2);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(20, 100);
-    tft.println("B1: Fire (GPIO 2)");
-    tft.setCursor(20, 140);
-    tft.println("B2: Fire (GPIO 5)");
-    
-    tft.setTextColor(ST77XX_YELLOW);
-    tft.setCursor(20, 200);
-    tft.println("B4: Exit");
-}
+
 
 void render_totp() {
     tft.fillScreen(ST77XX_BLACK);
@@ -545,7 +528,7 @@ void switch_state(AppState new_state) {
         render_menu(true);
     }
     else if(current_state == MODE_NAMETAG) render_nametag();
-    else if(current_state == MODE_TVBGONE) render_tvbgone();
+    else if(current_state == MODE_DEAUTH) render_wifi_radar(true);
     else if(current_state == MODE_TOTP) render_totp();
     else if(current_state == MODE_GAMES) switch_game_state(GAME_MENU);
     else if(current_state == MODE_LOCK) render_lock_screen(true);
@@ -839,17 +822,7 @@ void loop() {
             show_image_mode = true;
             save_state();
             render_nametag();
-        } else if (current_state == MODE_TVBGONE) {
-            strip.setBrightness(255);
-            for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(255,0,0));
-            strip.show();
-            tft.fillScreen(ST77XX_BLACK);
-            tft.setCursor(20, 100);
-            tft.setTextSize(3);
-            tft.println("FIRING GPIO 2!");
-            fire_tvbgone(2);
-            render_tvbgone();
-        }
+
     }
     if (curr_b2 && !state_b2) {
         if (current_state == MODE_MENU) {
@@ -864,22 +837,12 @@ void loop() {
             show_image_mode = false;
             save_state();
             render_nametag();
-        } else if (current_state == MODE_TVBGONE) {
-            strip.setBrightness(255);
-            for(int i=0; i<NUM_LEDS; i++) strip.setPixelColor(i, strip.Color(0,0,255));
-            strip.show();
-            tft.fillScreen(ST77XX_BLACK);
-            tft.setCursor(20, 100);
-            tft.setTextSize(3);
-            tft.println("FIRING GPIO 5!");
-            fire_tvbgone(5);
-            render_tvbgone();
         }
     }
     if (curr_b3 && !state_b3) {
         if (current_state == MODE_MENU) {
             if (menu_index == 0) switch_state(MODE_NAMETAG);
-            else if (menu_index == 1) switch_state(MODE_TVBGONE);
+            else if (menu_index == 1) switch_state(MODE_DEAUTH);
             else if (menu_index == 2) {
                 current_totp_slot = -1; // reset slot selection
                 switch_state(MODE_TOTP);
@@ -925,6 +888,6 @@ void loop() {
     if (current_state == MODE_GAMES) {
         loop_games();
     }
-
+}
     delay(10);
 }
