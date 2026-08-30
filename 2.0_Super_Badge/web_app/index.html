@@ -75,7 +75,7 @@
             if (!rxCharacteristic) return;
             const payload = JSON.stringify({ cmd: cmd, args: args }) + "\n";
             const encoder = new TextEncoder();
-            await rxCharacteristic.writeValueWithoutResponse(encoder.encode(payload));
+            await rxCharacteristic.writeValueWithResponse(encoder.encode(payload));
             log("Sent Cmd: " + cmd);
         }
 
@@ -152,17 +152,25 @@
             document.getElementById('sendImageBtn').innerText = "Uploading...";
             document.getElementById('sendImageBtn').disabled = true;
 
-            const chunkSize = 256; // Safe BLE MTU
+            const chunkSize = 128; // Smaller chunk size to avoid MTU issues
+            let dropped = false;
             for (let i = 0; i < jpegData.length; i += chunkSize) {
                 const chunk = jpegData.slice(i, i + chunkSize);
                 try {
-                    await rxCharacteristic.writeValueWithoutResponse(chunk);
-                    // Small delay to prevent overwhelming the ESP32 BLE stack
-                    await new Promise(r => setTimeout(r, 20));
+                    // writeValueWithResponse guarantees the ESP32 receives it before continuing
+                    await rxCharacteristic.writeValueWithResponse(chunk);
+                    
+                    // Update button text to show progress
+                    const percent = Math.round(((i + chunk.length) / jpegData.length) * 100);
+                    document.getElementById('sendImageBtn').innerText = `Uploading... ${percent}%`;
                 } catch(e) {
                     log("Stream error: " + e);
+                    dropped = true;
                     break;
                 }
+            }
+            if (dropped) {
+                log("Transfer failed. Please try again.");
             }
             log("Transfer complete!");
             document.getElementById('sendImageBtn').innerText = "🚀 Blast Image to Badge";
