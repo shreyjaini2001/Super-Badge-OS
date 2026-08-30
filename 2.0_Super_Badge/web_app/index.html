@@ -4,18 +4,36 @@
     <title>Super Badge Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background: #222; color: white; }
-        button { padding: 15px 30px; font-size: 18px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; background: #222; color: white; }
+        button { padding: 12px 24px; font-size: 16px; margin: 5px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; }
         button:active { background: #45a049; }
-        #logs { margin-top: 20px; font-family: monospace; color: #aaa; }
+        input[type="text"], input[type="file"] { padding: 10px; margin: 10px; font-size: 16px; border-radius: 5px; border: none; }
+        .panel { background: #333; padding: 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 400px; display: none; }
+        #logs { margin-top: 20px; font-family: monospace; color: #aaa; font-size: 12px; height: 100px; overflow-y: scroll; background: #111; padding: 10px; text-align: left; }
     </style>
 </head>
 <body>
     <h1>Super Badge BLE</h1>
-    <button id="connectBtn">Connect to Badge</button>
-    <br><br>
-    <button id="homeBtn" style="display:none; background: #008CBA;">Home Screen</button>
-    <button id="lockBtn" style="display:none; background: #f44336;">Lock Badge</button>
+    <button id="connectBtn">🔗 Connect to Badge</button>
+
+    <div id="controls" class="panel">
+        <button id="homeBtn" style="background: #008CBA;">🏠 Home Screen</button>
+        <button id="lockBtn" style="background: #f44336;">🔒 Lock Badge</button>
+    </div>
+
+    <div id="textPanel" class="panel">
+        <h3>📝 Update Nametag</h3>
+        <input type="text" id="nameInput" placeholder="Enter Name..." value="DEF CON Hacker"><br>
+        <button id="sendTextBtn">Send Text</button>
+    </div>
+
+    <div id="imagePanel" class="panel">
+        <h3>🖼️ Upload Image</h3>
+        <input type="file" id="imageInput" accept="image/*"><br>
+        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+        <img id="preview" style="width: 100%; max-width: 320px; border-radius: 5px; margin-top: 10px; display: none;" />
+        <button id="sendImageBtn" style="margin-top: 10px; display: none;">🚀 Blast Image to Badge</button>
+    </div>
 
     <div id="logs"></div>
 
@@ -24,7 +42,10 @@
         const RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
         let rxCharacteristic;
 
-        function log(msg) { document.getElementById('logs').innerText = msg + '\n' + document.getElementById('logs').innerText; }
+        function log(msg) { 
+            const l = document.getElementById('logs');
+            l.innerText = msg + '\n' + l.innerText; 
+        }
 
         document.getElementById('connectBtn').addEventListener('click', async () => {
             try {
@@ -34,27 +55,120 @@
                     optionalServices: [SERVICE_UUID]
                 });
                 log("Connecting to " + device.name + "...");
+                device.addEventListener('gattserverdisconnected', () => {
+                    log("Disconnected!");
+                    document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+                    document.getElementById('connectBtn').style.display = 'inline-block';
+                });
+
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 rxCharacteristic = await service.getCharacteristic(RX_UUID);
                 log("Connected Successfully!");
                 
                 document.getElementById('connectBtn').style.display = 'none';
-                document.getElementById('homeBtn').style.display = 'inline-block';
-                document.getElementById('lockBtn').style.display = 'inline-block';
+                document.querySelectorAll('.panel').forEach(p => p.style.display = 'block');
             } catch (err) { log("Error: " + err); }
         });
 
-        async function sendCommand(cmd) {
+        async function sendCommand(cmd, args={}) {
             if (!rxCharacteristic) return;
-            const payload = JSON.stringify({ cmd: cmd, args: {} }) + "\n";
+            const payload = JSON.stringify({ cmd: cmd, args: args }) + "\n";
             const encoder = new TextEncoder();
-            await rxCharacteristic.writeValue(encoder.encode(payload));
-            log("Sent: " + cmd);
+            await rxCharacteristic.writeValueWithoutResponse(encoder.encode(payload));
+            log("Sent Cmd: " + cmd);
         }
 
         document.getElementById('homeBtn').addEventListener('click', () => sendCommand('welcome'));
         document.getElementById('lockBtn').addEventListener('click', () => sendCommand('lock'));
+        
+        document.getElementById('sendTextBtn').addEventListener('click', () => {
+            sendCommand('display_text', {
+                msg: document.getElementById('nameInput').value,
+                size: 3, r: 0, g: 255, b: 255, align: "center"
+            });
+        });
+
+        // Image Handling
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('preview');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let jpegData = null;
+
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Resize to 320x240
+                    ctx.fillStyle = "black";
+                    ctx.fillRect(0, 0, 320, 240);
+                    
+                    const targetRatio = 320 / 240;
+                    const imgRatio = img.width / img.height;
+                    let drawWidth = 320, drawHeight = 240, offsetX = 0, offsetY = 0;
+
+                    if (imgRatio > targetRatio) {
+                        drawWidth = img.height * targetRatio;
+                        offsetX = (img.width - drawWidth) / 2;
+                        ctx.drawImage(img, offsetX, 0, drawWidth, img.height, 0, 0, 320, 240);
+                    } else {
+                        drawHeight = img.width / targetRatio;
+                        offsetY = (img.height - drawHeight) / 2;
+                        ctx.drawImage(img, 0, offsetY, img.width, drawHeight, 0, 0, 320, 240);
+                    }
+                    
+                    preview.src = canvas.toDataURL("image/jpeg", 0.8);
+                    preview.style.display = 'block';
+                    
+                    // Extract binary JPEG
+                    const base64Data = preview.src.split(',')[1];
+                    const binaryString = window.atob(base64Data);
+                    jpegData = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        jpegData[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    log(`Compressed to JPEG: ${jpegData.length} bytes`);
+                    document.getElementById('sendImageBtn').style.display = 'inline-block';
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('sendImageBtn').addEventListener('click', async () => {
+            if (!jpegData || !rxCharacteristic) return;
+            log("Sending image_start command...");
+            await sendCommand("image_jpeg", { size: jpegData.length });
+            
+            // Wait 100ms for ESP32 to open file
+            await new Promise(r => setTimeout(r, 100));
+
+            log(`Streaming ${jpegData.length} bytes...`);
+            document.getElementById('sendImageBtn').innerText = "Uploading...";
+            document.getElementById('sendImageBtn').disabled = true;
+
+            const chunkSize = 256; // Safe BLE MTU
+            for (let i = 0; i < jpegData.length; i += chunkSize) {
+                const chunk = jpegData.slice(i, i + chunkSize);
+                try {
+                    await rxCharacteristic.writeValueWithoutResponse(chunk);
+                    // Small delay to prevent overwhelming the ESP32 BLE stack
+                    await new Promise(r => setTimeout(r, 20));
+                } catch(e) {
+                    log("Stream error: " + e);
+                    break;
+                }
+            }
+            log("Transfer complete!");
+            document.getElementById('sendImageBtn').innerText = "🚀 Blast Image to Badge";
+            document.getElementById('sendImageBtn').disabled = false;
+        });
+
     </script>
 </body>
 </html>
