@@ -152,7 +152,7 @@
             document.getElementById('sendImageBtn').innerText = "Uploading...";
             document.getElementById('sendImageBtn').disabled = true;
 
-            const chunkSize = 128; // Smaller chunk size to avoid MTU issues
+            const chunkSize = 20; // 20 bytes is the absolute maximum safe payload for default BLE MTU
             let dropped = false;
             for (let i = 0; i < jpegData.length; i += chunkSize) {
                 const chunk = jpegData.slice(i, i + chunkSize);
