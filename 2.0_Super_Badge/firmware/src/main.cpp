@@ -11,6 +11,16 @@
 #include "ble_manager.h"
 #include <TOTP.h>
 #include "games.h"
+#include <TJpg_Decoder.h>
+
+bool is_receiving_jpeg = false;
+size_t jpeg_total_bytes = 0;
+size_t jpeg_bytes_received = 0;
+bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
+  if ( y >= tft.height() ) return 0;
+  tft.drawRGBBitmap(x, y, bitmap, w, h);
+  return 1;
+}
 
 // --- Constants & Pins ---
 #define LED_PIN     8
@@ -93,7 +103,7 @@ const int MENU_COUNT = 5;
 int menu_index = 0;
 
 const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle", "Lights Off"};
-const int PATTERN_COUNT = 8;
+const int PATTERN_COUNT = 5;
 int pattern_index = 0;
 
 // Function Prototypes
@@ -355,7 +365,9 @@ void render_menu(bool full_redraw) {
 
 void render_nametag() {
     if (show_image_mode) {
-        if(SPIFFS.exists("/image.raw")) {
+        if (SPIFFS.exists("/image.jpg")) {
+            TJpgDec.drawFsJpg(0, 0, "/image.jpg");
+        } else if(SPIFFS.exists("/image.raw")) {
             File f = SPIFFS.open("/image.raw", "r");
             if(f) {
                 uint8_t buffer[640]; 
@@ -536,6 +548,25 @@ void switch_state(AppState new_state) {
 }
 
 // --- API ---
+
+void handle_jpeg_chunk(const uint8_t* data, size_t len) {
+    if (!is_receiving_jpeg || !imgFile) return;
+    imgFile.write(data, len);
+    jpeg_bytes_received += len;
+    
+    // Safety timeout could be added here, but for now we trust the payload size
+    if (jpeg_bytes_received >= jpeg_total_bytes) {
+        imgFile.close();
+        is_receiving_jpeg = false;
+        Serial.println("JPEG fully received!");
+        sendBLE("{\"event\": \"jpeg_ok\"}");
+        
+        show_image_mode = true;
+        current_state = MODE_NAMETAG;
+        save_state();
+        render_nametag();
+    }
+}
 void processCommand(String data) {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data);
@@ -586,6 +617,14 @@ void processCommand(String data) {
         }
         Serial.println("{\"status\": \"ok\", \"cmd\": \"led_color\"}");
         sendBLE("{\"status\": \"ok\", \"cmd\": \"led_color\"}");
+    }
+    else if (cmd == "image_jpeg") {
+        jpeg_total_bytes = doc["args"]["size"].as<size_t>();
+        jpeg_bytes_received = 0;
+        imgFile = SPIFFS.open("/image.jpg", "w");
+        is_receiving_jpeg = true;
+        Serial.println("{\"status\": \"ok\", \"cmd\": \"image_jpeg\"}");
+        sendBLE("{\"status\": \"ok\", \"cmd\": \"image_jpeg\"}");
     }
     else if (cmd == "image_start") {
         imgFile = SPIFFS.open("/image.raw", "w");
@@ -729,6 +768,10 @@ void setup() {
     tft.init(240, 320);
     tft.setRotation(1);
     tft.invertDisplay(true);
+
+    TJpgDec.setJpgScale(1);
+    TJpgDec.setSwapBytes(false);
+    TJpgDec.setCallback(tft_output);
 
     setupBLE();
 
