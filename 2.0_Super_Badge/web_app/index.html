@@ -30,7 +30,7 @@
             try {
                 log("Scanning...");
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'SuperBadgeOS' }],
+                    filters: [{ namePrefix: 'SuperBadge' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 log("Connecting to " + device.name + "...");
