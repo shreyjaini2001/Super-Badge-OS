@@ -344,23 +344,23 @@ void render_menu(bool full_redraw) {
         tft.fillRect(0, 60, 320, 180, ST77XX_BLACK);
     }
     
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    tft.setTextSize(1);
+    tft.setCursor(20, 60);
+    tft.print("B1:Up  B2:Down  B3:Select");
+
     tft.setTextSize(2);
     for(int i = 0; i < MENU_COUNT; i++) {
-        int y = 80 + (i * 35);
+        int y = 80 + (i * 28);
         if (i == menu_index) {
             tft.setTextColor(ST77XX_BLACK, ST77XX_WHITE);
-            tft.fillRect(10, y-5, 300, 30, ST77XX_WHITE);
+            tft.fillRect(10, y-5, 300, 28, ST77XX_WHITE);
         } else {
             tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
         }
         tft.setCursor(20, y);
         tft.print(menu_items[i]);
     }
-    
-    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-    tft.setTextSize(1);
-    tft.setCursor(20, 220);
-    tft.print("B1:Up  B2:Down  B3:Select");
 }
 
 void render_nametag() {

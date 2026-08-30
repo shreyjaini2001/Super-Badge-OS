@@ -34,8 +34,9 @@ void render_games_menu(bool full_redraw) {
         tft.print(" "); tft.print(game_menu_items[i]); tft.print(" ");
     }
     tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-    tft.setCursor(10, 210);
-    tft.print("B1:Up B2:Dn B3:Sel B4:Exit");
+    tft.setTextSize(1);
+    tft.setCursor(10, 220);
+    tft.print("B1:Up  B2:Down  B3:Select  B4:Exit");
 }
 
 // --- PONG ---
