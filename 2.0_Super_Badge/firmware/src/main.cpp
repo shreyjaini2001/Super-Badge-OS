@@ -347,7 +347,7 @@ void render_menu(bool full_redraw) {
     tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
     tft.setTextSize(1);
     tft.setCursor(20, 60);
-    tft.print("B1:Up  B2:Down  B3:Select");
+    tft.print("B1:Up B2:Dn B3:Sel B4:Home");
 
     tft.setTextSize(2);
     for(int i = 0; i < MENU_COUNT; i++) {
