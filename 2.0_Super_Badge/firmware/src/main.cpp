@@ -748,10 +748,14 @@ void loop() {
     if (!(current_state == MODE_GAMES && current_game_state == GAME_SIMON)) {
         updateLEDs();
     if (current_state == MODE_WELCOME) {
-        if ((millis() / 500) % 2 == 0) tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-        else tft.setTextColor(ST77XX_BLACK, ST77XX_BLACK);
-        tft.setTextSize(1); tft.setCursor(85, 200);
-        tft.print("PRESS ANY BUTTON TO BEGIN");
+        static unsigned long last_blink = 0;
+        if (millis() - last_blink > 500) {
+            if ((millis() / 500) % 2 == 0) tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+            else tft.setTextColor(ST77XX_BLACK, ST77XX_BLACK);
+            tft.setTextSize(1); tft.setCursor(85, 200);
+            tft.print("PRESS ANY BUTTON TO BEGIN");
+            last_blink = millis();
+        }
     }
     }
 

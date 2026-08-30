@@ -50,7 +50,7 @@ class SuperBadgeApp(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Super Badge", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.btn_display = ctk.CTkButton(self.sidebar_frame, text="Display & LEDs", command=lambda: self.send_badge_cmd("welcome"))
+        self.btn_display = ctk.CTkButton(self.sidebar_frame, text="Display & LEDs", command=lambda: self.select_tab("display"))
         self.btn_display.grid(row=1, column=0, padx=20, pady=10)
 
         self.btn_tv = ctk.CTkButton(self.sidebar_frame, text="TV Blaster", command=lambda: self.select_tab("tv"))
@@ -65,7 +65,7 @@ class SuperBadgeApp(ctk.CTk):
         self.btn_security = ctk.CTkButton(self.sidebar_frame, text="Security (PIN)", command=lambda: self.select_tab("security"))
         self.btn_security.grid(row=5, column=0, padx=20, pady=10)
 
-        self.btn_home = ctk.CTkButton(self.sidebar_frame, text="🏠 Home Screen", fg_color="#2b7a4b", hover_color="#1e5434", command=self.go_home)
+        self.btn_home = ctk.CTkButton(self.sidebar_frame, text="🏠 Home Screen", fg_color="#2b7a4b", hover_color="#1e5434", command=lambda: self.send_badge_cmd("welcome"))
         self.btn_home.grid(row=6, column=0, padx=20, pady=20)
 
         # Appearance Mode
@@ -125,7 +125,7 @@ class SuperBadgeApp(ctk.CTk):
             print("Badge not connected via USB!")
 
     def go_home(self):
-        self.send_badge_cmd("home_screen")
+        self.send_badge_cmd("welcome")
 
     # --- Setup Tabs ---
     def setup_display_tab(self):
