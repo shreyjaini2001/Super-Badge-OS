@@ -171,10 +171,17 @@
             }
             if (dropped) {
                 log("Transfer failed. Please try again.");
+                document.getElementById('sendImageBtn').innerText = "🚀 Blast Image to Badge";
+                document.getElementById('sendImageBtn').disabled = false;
+            } else {
+                log("Transfer complete! Resetting UI...");
+                document.getElementById('preview').style.display = 'none';
+                document.getElementById('sendImageBtn').style.display = 'none';
+                document.getElementById('sendImageBtn').innerText = "🚀 Blast Image to Badge";
+                document.getElementById('sendImageBtn').disabled = false;
+                document.getElementById('imageInput').value = '';
+                jpegData = null;
             }
-            log("Transfer complete!");
-            document.getElementById('sendImageBtn').innerText = "🚀 Blast Image to Badge";
-            document.getElementById('sendImageBtn').disabled = false;
         });
 
     </script>
