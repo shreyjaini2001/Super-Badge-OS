@@ -40,8 +40,27 @@
     </div>
 
     <div id="textPanel" class="panel">
-        <h3>📝 Update Nametag</h3>
-        <input type="text" id="nameInput" placeholder="Enter Name..." value="DEF CON Hacker"><br>
+        <h3>📝 Update Nametag Text</h3>
+        <input type="text" id="nameInput" placeholder="Enter text..." value="DEF CON Hacker" style="width: 80%;"><br>
+        <div style="margin: 10px 0;">
+            <label>Color:</label> <input type="color" id="textColor" value="#00ffff" style="vertical-align: middle;">
+            <label style="margin-left:10px;">Size:</label>
+            <select id="textSize" style="padding: 5px;">
+                <option value="1">1 (Tiny)</option>
+                <option value="2">2 (Small)</option>
+                <option value="3" selected>3 (Medium)</option>
+                <option value="4">4 (Large)</option>
+                <option value="5">5 (Huge)</option>
+            </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label>Align:</label>
+            <select id="textAlign" style="padding: 5px;">
+                <option value="up">Top</option>
+                <option value="center" selected>Center</option>
+                <option value="down">Bottom</option>
+            </select>
+        </div>
         <button id="sendTextBtn">Send Text</button>
     </div>
 
@@ -126,7 +145,7 @@
         // LED Handlers
         document.getElementById('setPatternBtn').addEventListener('click', () => {
             const pattern = document.getElementById('ledPattern').value;
-            sendCommand('led_pattern', { pattern: pattern });
+            sendCommand('led_pattern', { type: pattern });
         });
         document.getElementById('setColorBtn').addEventListener('click', () => {
             const hex = document.getElementById('ledColor').value;
