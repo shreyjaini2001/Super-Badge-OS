@@ -1,26 +1,38 @@
-# Super Badge OS 
+# SuperBadge OS 2.0
 
-A complete reverse engineering, custom firmware, and desktop control application for the **DEF CON 34 Cryptocurrency Village Badge**.
+SuperBadge OS is a hyper-secure, offline-first operating system designed specifically for the DEFCON 32 badge (powered by an ESP32-C3 microcontroller). It completely overwrites the stock firmware to transform the badge into a cryptographic multi-tool, featuring offline TOTP generation, dynamic Nametags, NeoPixel controls, and classic retro games, all managed by a seamless Web Bluetooth (WebBLE) progressive web app.
+
+## Features
+
+- **Hardware TOTP Authenticator:** Generates time-based one-time passwords (TOTP) entirely offline, with secrets stored in the ESP32's non-volatile storage (NVS).
+- **Cryptographic Bluetooth Bonding:** The badge enforces Man-in-the-Middle (MITM) protection via NimBLE. It requires a dynamic 6-digit passkey displayed on the badge's TFT screen to pair with any smartphone, ensuring that the BLE connection is completely immune to eavesdropping.
+- **Web Bluetooth Control Panel:** A zero-installation web application hosted on GitHub Pages that interacts directly with the badge over encrypted BLE. It handles real-time time-syncing, TOTP token injection, Nametag customization, and image blasting.
+- **Dynamic Image Nametag:** Wirelessly blasts JPEG images over Bluetooth to be rendered on the ST7735 128x128 TFT screen, utilizing custom SPIFFS chunking and dynamic RGB565 byte-swapping.
+- **Backwards Compatible Python Client:** Legacy USB serial support for configuring the badge via a wired Mac/Linux/Windows machine.
+- **Physical Device Lock:** A customizable PIN lock screen prevents physical tampering of the badge's UI or extraction of TOTP tokens.
 
 ## Repository Structure
 
-- `/firmware` - Custom PlatformIO C++ firmware for the ESP32-C3 badge. Features a raw binary high-speed image upload protocol, ST7789 display drivers, and NeoPixel control.
-- `/app` - Python Desktop UI (Tkinter) that communicates with the badge over USB Serial to upload custom text, adjust LED colors, and stream live images to the screen.
-- `/docs` - Complete markdown documentation of the reverse engineering process, including the original badge architecture, hidden CTF wallet, and firmware rewrite plans.
-- `/dumps` - Original factory firmware and SPIFFS dumps extracted from the badge using `esptool.py`.
+- `2.0_Super_Badge/firmware/` - The C++ PlatformIO project containing the complete ESP32-C3 firmware.
+- `2.0_Super_Badge/web_app/` - The HTML/JS/CSS source code for the Web Bluetooth progressive web app.
+- `2.0_Super_Badge/python_app/` - The legacy Python Tkinter desktop application.
+- `docs/` - Comprehensive documentation for installation, architecture, and security design.
 
-## Features Restored / Upgraded
-- ✅ **Display Drivers:** Fully configured ST7789 for the 240x320 panel.
-- ✅ **NeoPixel LEDs:** 16 addressable LEDs with multiple animation patterns.
-- ✅ **High-Speed Image Upload:** Direct RAW binary transfer protocol that bypasses native USB CDC buffer limits.
-- ✅ **Non-Volatile Storage:** Badge remembers its last screen state, text, and LED pattern after reboot using `LittleFS` and `Preferences`.
+## Documentation Trail
 
-*Work in Progress: Restoring physical button inputs, TV-B-Gone IR blaster, and Laser Tag.*
+To understand how this project was built and how you can replicate it on your own DEFCON badge, please explore the comprehensive documentation:
 
-## Super Badge OS 2.0
-The `2.0_Super_Badge` folder contains a complete rewrite of the badge operating system with a standalone state machine!
-*   **Menu System**: Fully interactive main menu using B1 (Up), B2 (Down), B3 (Select), B4 (Exit).
-*   **Nametag Mode**: Displays text and images. Remembers state across reboots using NVS Persistence.
-*   **LED Engine**: Features 7 different patterns including Mixed Cylon, Mixed Twinkle, and Rainbow Sparkle.
-*   **Bluetooth Low Energy (BLE)**: Supports updating the badge completely wirelessly using the Android "Serial Bluetooth Terminal" app!
-*   **Fast Image Uploading**: Streams raw RGB565 files directly into SPIFFS storage.
+1. [Installation & Flashing Guide](docs/installation.md) - How to wipe your badge and install SuperBadge OS.
+2. [Security Architecture & BLE Bonding](docs/security_model.md) - A deep dive into the cryptography, NimBLE stack, and why the system was built completely offline.
+3. [System Architecture Diagrams](docs/architecture.md) - Mermaid diagrams explaining the firmware state machine, WebBLE data flow, and SPIFFS memory management.
+4. [Development Challenges](docs/challenges.md) - A log of the engineering hurdles faced during development (e.g. RGB565 color inversion, Web Bluetooth MTU limits, NimBLE passkey quirks).
+
+## Security Perspective & Learnings
+
+This project was engineered from the ground up to explore hardware-level security constraints:
+- **Zero-Network Trust:** The ESP32 deliberately has its WiFi stack disabled. All time-syncing and configuration happens over BLE, meaning the device cannot be remotely attacked via the internet.
+- **Hardware-Backed Secrets:** TOTP Base32 secrets are saved in the ESP32's NVS layer. The user must possess the physical badge and bypass the physical lock screen to view the 6-digit codes.
+- **BLE Passkey Entry:** By weaponizing the ESP32's TFT screen as a `DISPLAY_ONLY` capability, we force the Android/iOS device into a strict Passkey Entry pairing mode, mitigating Just-Works MITM vulnerabilities.
+
+## License
+MIT License
