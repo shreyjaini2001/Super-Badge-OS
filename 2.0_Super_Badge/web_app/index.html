@@ -19,6 +19,10 @@
     <div id="controls" class="panel">
         <button id="homeBtn" style="background: #008CBA;">🏠 Home Screen</button>
         <button id="lockBtn" style="background: #f44336;">🔒 Lock Badge</button>
+        <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
+            <input type="text" id="pinInput" placeholder="New PIN (e.g. 1234)" style="width: 120px;">
+            <button id="setPinBtn">Set Badge PIN</button>
+        </div>
     </div>
 
     <div id="ledPanel" class="panel">
@@ -141,6 +145,11 @@
 
         document.getElementById('homeBtn').addEventListener('click', () => sendCommand('welcome'));
         document.getElementById('lockBtn').addEventListener('click', () => sendCommand('lock'));
+        document.getElementById('setPinBtn').addEventListener('click', () => {
+            const pin = document.getElementById('pinInput').value;
+            sendCommand('set_pin', { pin: pin });
+            alert("PIN Updated! To clear it, leave it blank and hit Set.");
+        });
 
         // LED Handlers
         document.getElementById('setPatternBtn').addEventListener('click', () => {
