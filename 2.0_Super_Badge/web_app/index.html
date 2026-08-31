@@ -35,6 +35,22 @@
         <button id="sendImageBtn" style="margin-top: 10px; display: none;">🚀 Blast Image to Badge</button>
     </div>
 
+    <div id="totpPanel" class="panel">
+        <h3>🔐 TOTP Tokens</h3>
+        <select id="totpSlot" style="padding: 10px; margin-bottom: 5px; font-size: 16px; border-radius: 5px;">
+            <option value="0">Slot 1</option>
+            <option value="1">Slot 2</option>
+            <option value="2">Slot 3</option>
+            <option value="3">Slot 4</option>
+            <option value="4">Slot 5</option>
+            <option value="5">Slot 6</option>
+        </select><br>
+        <input type="text" id="totpName" placeholder="Account Name (e.g. GitHub)" style="width: 80%;"><br>
+        <input type="text" id="totpSecret" placeholder="Base32 Secret" style="width: 80%;"><br>
+        <button id="addTotpBtn">Add Token</button>
+        <button id="delTotpBtn" style="background: #f44336;">Delete</button>
+    </div>
+
     <div id="logs"></div>
 
     <script>
@@ -66,6 +82,13 @@
                 rxCharacteristic = await service.getCharacteristic(RX_UUID);
                 log("Connected Successfully!");
                 
+                // Auto Sync Time
+                const unixTime = Math.floor(Date.now() / 1000);
+                setTimeout(async () => {
+                    await sendCommand("sync_time", { t: unixTime });
+                    log("Time Synced: " + unixTime);
+                }, 500);
+                
                 document.getElementById('connectBtn').style.display = 'none';
                 document.querySelectorAll('.panel').forEach(p => p.style.display = 'block');
             } catch (err) { log("Error: " + err); }
@@ -81,6 +104,20 @@
 
         document.getElementById('homeBtn').addEventListener('click', () => sendCommand('welcome'));
         document.getElementById('lockBtn').addEventListener('click', () => sendCommand('lock'));
+        
+        // TOTP Handlers
+        document.getElementById('addTotpBtn').addEventListener('click', () => {
+            const slot = parseInt(document.getElementById('totpSlot').value);
+            const name = document.getElementById('totpName').value.trim();
+            const secret = document.getElementById('totpSecret').value.trim().replace(/ /g, '').toUpperCase();
+            if(!name || !secret) return alert("Need name and secret!");
+            sendCommand('add_totp', { slot: slot, name: name, secret: secret });
+        });
+        
+        document.getElementById('delTotpBtn').addEventListener('click', () => {
+            const slot = parseInt(document.getElementById('totpSlot').value);
+            sendCommand('delete_totp', { slot: slot });
+        });
         
         document.getElementById('sendTextBtn').addEventListener('click', () => {
             sendCommand('display_text', {
