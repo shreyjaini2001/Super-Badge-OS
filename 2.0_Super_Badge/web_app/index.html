@@ -121,18 +121,21 @@
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 rxCharacteristic = await service.getCharacteristic(RX_UUID);
-                log("Connected Successfully!");
                 
-                // Auto Sync Time
+                // Trigger BLE Pairing by attempting a write BEFORE showing UI
                 const unixTime = Math.floor(Date.now() / 1000);
-                setTimeout(async () => {
-                    await sendCommand("sync_time", { t: unixTime });
-                    log("Time Synced: " + unixTime);
-                }, 500);
+                await sendCommand("sync_time", { t: unixTime });
+                
+                // If it fails or user hits Cancel on the PIN prompt, an exception is thrown
+                // and the code below will NEVER execute.
+                
+                log("Connected Successfully & Time Synced!");
                 
                 document.getElementById('connectBtn').style.display = 'none';
                 document.querySelectorAll('.panel').forEach(p => p.style.display = 'block');
-            } catch (err) { log("Error: " + err); }
+            } catch (err) { 
+                log("Connection/Pairing Failed: " + err); 
+            }
         });
 
         async function sendCommand(cmd, args={}) {
