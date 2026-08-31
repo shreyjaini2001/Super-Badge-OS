@@ -103,7 +103,7 @@ const int MENU_COUNT = 5;
 int menu_index = 0;
 
 const char* patterns[] = {"Solid", "Rainbow", "Breathe", "Theater Chase", "Mixed Cylon", "Mixed Twinkle", "Rainbow Sparkle", "Lights Off"};
-const int PATTERN_COUNT = 5;
+const int PATTERN_COUNT = 8;
 int pattern_index = 0;
 
 // Function Prototypes
@@ -562,9 +562,10 @@ void handle_jpeg_chunk(const uint8_t* data, size_t len) {
         sendBLE("{\"event\": \"jpeg_ok\"}");
         
         show_image_mode = true;
-        current_state = MODE_NAMETAG;
         save_state();
-        render_nametag();
+        if (current_state == MODE_NAMETAG) {
+            render_nametag();
+        }
     }
 }
 void processCommand(String data) {
