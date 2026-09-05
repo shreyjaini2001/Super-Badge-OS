@@ -15,7 +15,35 @@ SuperBadge OS is a hyper-secure, offline-first operating system designed specifi
 
 SuperBadge OS 2.0 is running on the DEFCON 32 badge, with the boot screen, main menu, custom display content, RGB LED effects, and nametag features shown in the latest hardware demo.
 
-[View the photo gallery and working video](docs/demo.md)
+<p align="center">
+	<img src="Photos/images/badge-welcome-screen.jpeg" alt="SuperBadge OS welcome screen" width="410">
+	<img src="Photos/images/badge-main-menu.jpeg" alt="SuperBadge OS main menu" width="410">
+</p>
+<p align="center">
+	<img src="Photos/images/badge-image-display.jpeg" alt="Custom image displayed on the badge" width="410">
+	<img src="Photos/images/badge-rgb-leds-and-nametag.jpeg" alt="RGB LEDs and custom nametag" width="410">
+</p>
+
+<p align="center">
+	<video src="Photos/video/badge-working-demo.mp4" controls width="820"></video>
+</p>
+
+<p align="center">
+	<a href="Photos/video/badge-working-demo.mp4">Watch the badge working demo</a> |
+	<a href="docs/demo.md">Open the complete photo gallery</a>
+</p>
+
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+		User[User] --> WebApp[Web Bluetooth Web App]
+		WebApp -->|Encrypted BLE| Badge[ESP32-C3 Badge]
+		Badge --> Display[ST7735 TFT Display]
+		Badge --> LEDs[RGB LEDs]
+		Badge --> Storage[SPIFFS and NVS]
+		Badge --> Features[ TOTP / Nametag / Games / Lock ]
+```
 
 ## Repository Structure
 
