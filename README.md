@@ -11,6 +11,12 @@ SuperBadge OS is a hyper-secure, offline-first operating system designed specifi
 - **Backwards Compatible Python Client:** Legacy USB serial support for configuring the badge via a wired Mac/Linux/Windows machine.
 - **Physical Device Lock:** A customizable PIN lock screen prevents physical tampering of the badge's UI or extraction of TOTP tokens.
 
+## Working Demo
+
+SuperBadge OS 2.0 is running on the DEFCON 32 badge, with the boot screen, main menu, custom display content, RGB LED effects, and nametag features shown in the latest hardware demo.
+
+[View the photo gallery and working video](docs/demo.md)
+
 ## Repository Structure
 
 - `2.0_Super_Badge/firmware/` - The C++ PlatformIO project containing the complete ESP32-C3 firmware.
